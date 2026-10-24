@@ -11,6 +11,15 @@ import { registerUser, loginUser } from './services/authService.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Load environment variables (.env) natively
+if (typeof process.loadEnvFile === 'function') {
+  try {
+    process.loadEnvFile();
+  } catch (e) {
+    // .env file is optional
+  }
+}
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -92,7 +101,7 @@ app.post('/api/auth/login', (req, res) => {
 // Main Analysis Endpoint (Evidence-Grounded, Non-Fabricating)
 app.post('/api/analyze', async (req, res) => {
   try {
-    const { type, content, presetId } = req.body;
+    const { type, content, presetId, userProvidedDetails } = req.body;
 
     // Explicit DEMO preset requested by ID
     if (presetId) {
@@ -107,10 +116,10 @@ app.post('/api/analyze', async (req, res) => {
     }
 
     // Step 1: Entity Extraction & NLP (Extracts strictly from user input)
-    const extractedData = extractEntitiesFromInput(content, type);
+    const extractedData = extractEntitiesFromInput(content, type, userProvidedDetails);
 
     // Step 2: Evidence-Based Network & Forensic Audit
-    const auditResult = await runComprehensiveAudit(extractedData);
+    const auditResult = await runComprehensiveAudit(extractedData, userProvidedDetails);
 
     return res.json({ ...auditResult, isDemoPreset: false });
   } catch (err) {

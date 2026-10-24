@@ -57,6 +57,27 @@ export function isGenericPlatformOrTool(name) {
   return platforms.some(p => n === p || n === p + 's' || n.startsWith(p + ' ') || n.endsWith(' ' + p));
 }
 
+export const THIRD_PARTY_OR_SHORTENER_DOMAINS = [
+  'whatsapp.com', 'chat.whatsapp.com', 'wa.me',
+  'telegram.org', 't.me', 'telegram.me',
+  'bit.ly', 'tinyurl.com', 'cutt.ly', 'rb.gy', 'is.gd', 't.co', 'ow.ly',
+  'docs.google.com', 'forms.gle', 'drive.google.com', 'google.com', 'sites.google.com',
+  'dropbox.com', 'canva.com', 'discord.gg', 'discord.com',
+  'facebook.com', 'instagram.com', 'twitter.com', 'x.com', 'linkedin.com', 'youtube.com'
+];
+
+export const FREE_MAIL_DOMAINS = [
+  'gmail.com', 'yahoo.com', 'yahoo.in', 'yahoo.co.in', 'outlook.com', 
+  'hotmail.com', 'live.com', 'icloud.com', 'mail.com', 'zoho.com',
+  'protonmail.com', 'rediffmail.com', 'yandex.com'
+];
+
+export function isThirdPartyOrPlatformDomain(domain) {
+  if (!domain) return false;
+  const d = domain.toLowerCase().trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/:\d+$/, '');
+  return THIRD_PARTY_OR_SHORTENER_DOMAINS.some(tp => d === tp || d.endsWith('.' + tp));
+}
+
 export function extractSnippet(text, pattern) {
   if (!text) return null;
   const lines = text.split(/[\r\n]+/);
@@ -75,7 +96,7 @@ export function extractSnippet(text, pattern) {
   return null;
 }
 
-export function extractEntitiesFromInput(inputText, inputType = 'text') {
+export function extractEntitiesFromInput(inputText, inputType = 'text', userProvidedDetails = null) {
   const text = (inputText || '').trim();
   
   // Extract URLs
@@ -90,23 +111,27 @@ export function extractEntitiesFromInput(inputText, inputType = 'text') {
   const phoneRegex = /(\+?\d{1,3}[-.\s]?)?(\(?\d{3}\)?[-.\s]?)?\d{3}[-.\s]?\d{4,5}/g;
   const phones = text.match(phoneRegex) || [];
 
-  // Extract Physical Office Address strictly from input
+  // Extract Physical Office Address strictly from input or user-provided field
   let detectedAddress = null;
-  const addressPrefixMatch = text.match(/(?:office\s*address|corporate\s*address|registered\s*office|headquarters|location|address|report\s*to)[:\s]+([^\n\r]{10,140})/i);
-  if (addressPrefixMatch) {
-    detectedAddress = addressPrefixMatch[1].trim().replace(/^[,\s.-]+/, '');
+  if (userProvidedDetails?.companyAddress && userProvidedDetails.companyAddress.trim()) {
+    detectedAddress = userProvidedDetails.companyAddress.trim();
   } else {
-    // Search for explicit street, road, nagar, floor, pin code, colony, sector
-    const genericAddressMatch = text.match(/([a-zA-Z0-9\s,.-]+(?:road|street|nagar|marg|sector|phase|layout|tech\s*park|tower|building|floor|campus|colony|extension|flat|block|plot)[a-zA-Z0-9\s,.-]+(?:\d{5,6})?)/i);
-    if (genericAddressMatch && genericAddressMatch[0].trim().length > 10) {
-      detectedAddress = genericAddressMatch[0].trim().replace(/^[,\s.-]+/, '');
+    const addressPrefixMatch = text.match(/(?:office\s*address|corporate\s*address|registered\s*office|headquarters|location|address|report\s*to)[:\s]+([^\n\r]{10,140})/i);
+    if (addressPrefixMatch) {
+      detectedAddress = addressPrefixMatch[1].trim().replace(/^[,\s.-]+/, '');
+    } else {
+      // Search for explicit street, road, nagar, floor, pin code, colony, sector
+      const genericAddressMatch = text.match(/([a-zA-Z0-9\s,.-]+(?:road|street|nagar|marg|sector|phase|layout|tech\s*park|tower|building|floor|campus|colony|extension|flat|block|plot)[a-zA-Z0-9\s,.-]+(?:\d{5,6})?)/i);
+      if (genericAddressMatch && genericAddressMatch[0].trim().length > 10) {
+        detectedAddress = genericAddressMatch[0].trim().replace(/^[,\s.-]+/, '');
+      }
     }
-  }
 
-  if (detectedAddress) {
-    detectedAddress = detectedAddress.split(/\.\s+(?:contact|email|phone|tel|call|please|we|regards|sincerely|you\s+must|pay|fee|deposit)/i)[0].trim();
-    detectedAddress = detectedAddress.replace(/[.,;]+$/, '').trim();
-    if (detectedAddress.length < 8) detectedAddress = null;
+    if (detectedAddress) {
+      detectedAddress = detectedAddress.split(/\.\s+(?:contact|email|phone|tel|call|please|we|regards|sincerely|you\s+must|pay|fee|deposit)/i)[0].trim();
+      detectedAddress = detectedAddress.replace(/[.,;]+$/, '').trim();
+      if (detectedAddress.length < 8) detectedAddress = null;
+    }
   }
 
   // Detect Money / Deposit / Fees
@@ -170,6 +195,24 @@ export function extractEntitiesFromInput(inputText, inputType = 'text') {
     }
   }
   const fakeUrgency = !!urgencySnippet;
+
+  // Detect WhatsApp / Telegram link or redirection to informal channel
+  const informalMessagingPatterns = [
+    /chat\.whatsapp\.com\/[A-Za-z0-9_-]+/i,
+    /wa\.me\/(?:\+?\d+)/i,
+    /api\.whatsapp\.com\/send/i,
+    /t\.me\/(?:joinchat\/)?[A-Za-z0-9_+-]+/i,
+    /telegram\.me\/[A-Za-z0-9_+-]+/i,
+    /(?:join|connect\s+via|message\s+us\s+on)\s+(?:our\s+)?(?:whatsapp|telegram)\s+(?:group|chat|link)/i
+  ];
+  let informalChannelSnippet = null;
+  for (const pattern of informalMessagingPatterns) {
+    if (pattern.test(text)) {
+      informalChannelSnippet = extractSnippet(text, pattern);
+      break;
+    }
+  }
+  const informalMessagingChannel = !!informalChannelSnippet;
 
   // Detect CIN and GSTIN
   const cinMatch = text.match(/[LU]\d{5}[A-Z]{2}\d{4}[A-Z]{3}\d{6}/i);
@@ -272,9 +315,12 @@ export function extractEntitiesFromInput(inputText, inputType = 'text') {
     }
   }
 
-  // 7. Website URL if present (ignore social/platform URLs)
+  // 7. Website URL if present (strictly ignore social/platform URLs, link shorteners, free mail)
   if (!detectedCompanyName && urls.length > 0) {
-    const nonPlatformUrl = urls.find(u => !u.includes('linkedin.com') && !u.includes('google.com') && !u.includes('facebook.com'));
+    const nonPlatformUrl = urls.find(u => {
+      const cleanU = u.replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/:\d+$/, '').toLowerCase();
+      return !isThirdPartyOrPlatformDomain(cleanU) && !FREE_MAIL_DOMAINS.some(f => cleanU === f || cleanU.endsWith('.' + f));
+    });
     if (nonPlatformUrl) {
       const cleanUrl = nonPlatformUrl.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
       detectedCompanyName = formatDomainToCompanyName(cleanUrl);
@@ -285,21 +331,29 @@ export function extractEntitiesFromInput(inputText, inputType = 'text') {
     detectedCompanyName = 'Unspecified';
   }
 
-  // Determine Corporate Domain (distinct from social media host like linkedin.com)
+  // Determine Corporate Domain (strictly distinct from social media hosts, shorteners, cloud platforms, and free-mail)
   let detectedDomain = null;
-  const corporateUrl = urls.find(u => !u.includes('linkedin.com') && !u.includes('google.com') && !u.includes('facebook.com'));
+  const corporateUrl = urls.find(u => {
+    const cleanU = u.replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/:\d+$/, '').toLowerCase();
+    return !isThirdPartyOrPlatformDomain(cleanU) && !FREE_MAIL_DOMAINS.some(f => cleanU === f || cleanU.endsWith('.' + f));
+  });
+
   if (corporateUrl) {
     detectedDomain = corporateUrl.replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/:\d+$/, '');
   } else if (emails.length > 0) {
-    const dom = emails[0].split('@')[1];
-    if (!['gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com'].includes(dom)) {
+    const dom = (emails[0].split('@')[1] || '').toLowerCase();
+    if (dom && !FREE_MAIL_DOMAINS.includes(dom) && !isThirdPartyOrPlatformDomain(dom)) {
       detectedDomain = dom;
     }
   } else {
     // Check for inline domain pattern (e.g. acme.com)
-    const inlineDomainMatch = text.match(/(?:https?:\/\/)?(?:www\.)?([a-zA-Z0-9_-]+\.(?:tech|com|in|org|net|co|io|edu|ac|gov))\b/i);
-    if (inlineDomainMatch && !inlineDomainMatch[1].includes('linkedin.com') && !inlineDomainMatch[1].includes('google.com')) {
-      detectedDomain = inlineDomainMatch[1];
+    const inlineDomainMatches = text.matchAll(/(?:https?:\/\/)?(?:www\.)?([a-zA-Z0-9_-]+\.(?:tech|com|in|org|net|co|io|edu|ac|gov))\b/gi);
+    for (const match of inlineDomainMatches) {
+      const cand = match[1].toLowerCase();
+      if (!isThirdPartyOrPlatformDomain(cand) && !FREE_MAIL_DOMAINS.includes(cand)) {
+        detectedDomain = match[1];
+        break;
+      }
     }
   }
 
@@ -320,6 +374,7 @@ export function extractEntitiesFromInput(inputText, inputType = 'text') {
     gstin: gstinMatch ? gstinMatch[0].toUpperCase() : null,
     ticker: tickerMatch ? tickerMatch[1] : null,
     linkedInUrl: linkedInUrlMatch ? linkedInUrlMatch[0] : null,
+    userProvidedDetails: userProvidedDetails || null,
     flags: {
       moneyDemanded,
       feeSnippet,
@@ -332,7 +387,9 @@ export function extractEntitiesFromInput(inputText, inputType = 'text') {
       asksDocsOverChat,
       docsSnippet,
       fakeUrgency,
-      urgencySnippet
+      urgencySnippet,
+      informalMessagingChannel,
+      informalChannelSnippet
     }
   };
 }

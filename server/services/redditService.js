@@ -1,5 +1,45 @@
-// Reddit Community Discussions Service - 100% Real API Fetches
-// No simulated posts, manufactured upvotes, or fake AmbitionBox/Glassdoor star ratings.
+// Reddit Community Discussions Service - Official OAuth & Real API Fetches
+// No simulated posts, manufactured upvotes, or fake reviews.
+
+let cachedToken = null;
+let tokenExpiresAt = 0;
+
+const USER_AGENT = 'VeriFirmEvidenceAudit/2.0 (by /u/VeriFirmApp)';
+
+async function getRedditOAuthToken(clientId, clientSecret) {
+  if (cachedToken && Date.now() < tokenExpiresAt) {
+    return cachedToken;
+  }
+
+  try {
+    const authHeader = 'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+    const response = await fetch('https://www.reddit.com/api/v1/access_token', {
+      method: 'POST',
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': USER_AGENT
+      },
+      body: 'grant_type=client_credentials',
+      signal: AbortSignal.timeout(3500)
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    if (data.access_token) {
+      cachedToken = data.access_token;
+      // Expires in seconds; subtract 60s buffer
+      tokenExpiresAt = Date.now() + Math.max(60, (data.expires_in - 60)) * 1000;
+      return cachedToken;
+    }
+  } catch (e) {
+    console.error('Reddit OAuth token request failed:', e.message);
+  }
+  return null;
+}
 
 export async function getRedditAndReviewSentiment(companyName) {
   const cleanName = (companyName || '').trim();
@@ -19,20 +59,42 @@ export async function getRedditAndReviewSentiment(companyName) {
     };
   }
 
+  const clientId = process.env.REDDIT_CLIENT_ID;
+  const clientSecret = process.env.REDDIT_CLIENT_SECRET;
+  const query = `${cleanName} job offer`;
+
   try {
-    const query = `${cleanName} job offer`;
-    const apiUrl = `https://www.reddit.com/search.json?q=${encodeURIComponent(query)}&limit=5&sort=relevance`;
-    const response = await fetch(apiUrl, {
-      headers: {
-        'User-Agent': 'VeriFirmEvidenceAudit/2.0 (Mozilla/5.0)'
-      },
-      signal: AbortSignal.timeout(3500)
-    });
+    let response;
+    let sourceName = 'Reddit Public Search API';
+
+    if (clientId && clientSecret) {
+      const token = await getRedditOAuthToken(clientId, clientSecret);
+      if (token) {
+        sourceName = 'Official Reddit OAuth API';
+        response = await fetch(`https://oauth.reddit.com/search?q=${encodeURIComponent(query)}&limit=5&sort=relevance`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'User-Agent': USER_AGENT
+          },
+          signal: AbortSignal.timeout(3500)
+        });
+      }
+    }
+
+    if (!response) {
+      // Fallback to public search with descriptive User-Agent
+      response = await fetch(`https://www.reddit.com/search.json?q=${encodeURIComponent(query)}&limit=5&sort=relevance`, {
+        headers: {
+          'User-Agent': USER_AGENT
+        },
+        signal: AbortSignal.timeout(3500)
+      });
+    }
 
     if (!response.ok) {
       return {
         status: 'not_checked',
-        source: 'Reddit Public Search API',
+        source: sourceName,
         checkedAt,
         redditPosts: [],
         searchUrl,
@@ -44,11 +106,11 @@ export async function getRedditAndReviewSentiment(companyName) {
     if (!contentType.includes('application/json')) {
       return {
         status: 'not_checked',
-        source: 'Reddit Public Search API',
+        source: sourceName,
         checkedAt,
         redditPosts: [],
         searchUrl,
-        message: 'Reddit API blocked unauthenticated query. Direct community search link provided below.'
+        message: 'Reddit API returned non-JSON response. Direct community search link provided below.'
       };
     }
 
@@ -72,7 +134,7 @@ export async function getRedditAndReviewSentiment(companyName) {
     if (realPosts.length === 0) {
       return {
         status: 'no_posts_found',
-        source: 'Reddit Public Search API',
+        source: sourceName,
         checkedAt,
         redditPosts: [],
         searchUrl,
@@ -82,7 +144,7 @@ export async function getRedditAndReviewSentiment(companyName) {
 
     return {
       status: 'verified',
-      source: 'Reddit Public Search API',
+      source: sourceName,
       checkedAt,
       redditPosts: realPosts,
       searchUrl,
@@ -91,7 +153,7 @@ export async function getRedditAndReviewSentiment(companyName) {
   } catch (err) {
     return {
       status: 'not_checked',
-      source: 'Reddit Public Search API',
+      source: 'Reddit API',
       checkedAt,
       redditPosts: [],
       searchUrl,

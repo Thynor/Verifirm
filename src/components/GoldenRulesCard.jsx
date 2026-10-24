@@ -42,15 +42,17 @@ export function GoldenRulesCard({ goldenRules = {}, redFlags = [], greenFlags = 
   ];
 
   return (
-    <div className="p-6 rounded-2xl bg-[#091020] border border-slate-800 space-y-6">
+    <div className="p-6 rounded-2xl bg-white dark:bg-[#091020] border border-slate-200 dark:border-slate-800 space-y-6 shadow-sm">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <ShieldAlert className="w-5 h-5 text-cyan-400" />
-          <h2 className="text-lg font-bold text-white">
-            The 5 Golden Rules of Authorized Hiring
+          <ShieldAlert className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+            The 5 Golden Rules of Safe Hiring
           </h2>
         </div>
-        <span className="text-xs font-mono text-slate-400">Security Gate Check</span>
+        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+          Security Gate Check
+        </span>
       </div>
 
       {/* 5 Rules Grid */}
@@ -65,40 +67,40 @@ export function GoldenRulesCard({ goldenRules = {}, redFlags = [], greenFlags = 
               key={idx}
               className={`p-4 rounded-xl border transition-all ${
                 isPassed
-                  ? 'bg-emerald-950/20 border-emerald-900/40 text-emerald-300'
+                  ? 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/40 text-emerald-900 dark:text-emerald-300'
                   : isFailed
-                    ? 'bg-rose-950/30 border-rose-900/60 text-rose-300'
-                    : 'bg-slate-900/40 border-slate-800 text-slate-400'
+                    ? 'bg-rose-50/70 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900/60 text-rose-900 dark:text-rose-300'
+                    : 'bg-slate-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
               }`}
             >
               <div className="flex items-start justify-between gap-2 mb-2">
-                <span className="font-semibold text-sm text-white">{rule.title}</span>
+                <span className="font-bold text-sm text-slate-900 dark:text-white">{rule.title}</span>
                 {isPassed ? (
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 ) : isFailed ? (
-                  <XCircle className="w-5 h-5 text-rose-400 shrink-0" />
+                  <XCircle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0" />
                 ) : (
-                  <MinusCircle className="w-5 h-5 text-slate-500 shrink-0" />
+                  <MinusCircle className="w-5 h-5 text-slate-400 dark:text-slate-500 shrink-0" />
                 )}
               </div>
               <div className="flex items-center justify-between mb-2">
-                <p className="text-[11px] text-slate-400 leading-relaxed">{rule.subtitle}</p>
-                <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded shrink-0 ml-2 ${
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">{rule.subtitle}</p>
+                <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full shrink-0 ml-2 font-bold ${
                   isPassed
-                    ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                    ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
                     : isFailed
-                      ? 'bg-rose-950 text-rose-300 border border-rose-800'
-                      : 'bg-slate-800 text-slate-400 border border-slate-700'
+                      ? 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-800'
+                      : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-400 border border-slate-300 dark:border-slate-700'
                 }`}>
                   {isPassed ? 'PASSED' : isFailed ? 'FAILED' : 'NOT CHECKED'}
                 </span>
               </div>
-              <div className={`text-xs p-2 rounded-lg font-mono leading-relaxed ${
+              <div className={`text-xs p-2.5 rounded-lg leading-relaxed ${
                 isPassed 
-                  ? 'bg-emerald-950/40 text-emerald-200' 
+                  ? 'bg-emerald-100/60 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200' 
                   : isFailed 
-                    ? 'bg-rose-950/60 text-rose-200 font-bold' 
-                    : 'bg-slate-900/60 text-slate-400'
+                    ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-900 dark:text-rose-200 font-bold border border-rose-200 dark:border-rose-800' 
+                    : 'bg-slate-100 dark:bg-slate-900/60 text-slate-700 dark:text-slate-400'
               }`}>
                 {rule.details}
               </div>
@@ -110,24 +112,24 @@ export function GoldenRulesCard({ goldenRules = {}, redFlags = [], greenFlags = 
       {/* Red Flags / Green Flags Lists */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2">
         {/* Red Flags */}
-        <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-3">
-          <div className="flex items-center gap-2 text-rose-400 font-semibold text-xs uppercase tracking-wider">
+        <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-3">
+          <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400 font-bold text-xs uppercase tracking-wider">
             <AlertTriangle className="w-4 h-4" />
             <span>Identified Red Flags ({redFlags.length})</span>
           </div>
           {redFlags.length === 0 ? (
-            <p className="text-xs text-slate-500 italic">No critical red flags identified during security scan.</p>
+            <p className="text-xs text-slate-500 italic">No critical red flags identified during verification.</p>
           ) : (
             <div className="space-y-2">
               {redFlags.map((flag, i) => (
-                <div key={i} className="text-xs p-2.5 rounded-lg bg-rose-950/30 border border-rose-900/40 space-y-1">
+                <div key={i} className="text-xs p-3 rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/40 space-y-1">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-rose-300">{flag.rule}</span>
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-rose-900/80 text-rose-200">
+                    <span className="font-bold text-rose-800 dark:text-rose-300">{flag.rule}</span>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-900/80 text-rose-800 dark:text-rose-200 font-bold">
                       {flag.severity}
                     </span>
                   </div>
-                  <p className="text-slate-300 text-[11px]">{flag.description}</p>
+                  <p className="text-slate-700 dark:text-slate-300 text-[11px] leading-relaxed">{flag.description}</p>
                 </div>
               ))}
             </div>
@@ -135,18 +137,18 @@ export function GoldenRulesCard({ goldenRules = {}, redFlags = [], greenFlags = 
         </div>
 
         {/* Green Flags */}
-        <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-3">
-          <div className="flex items-center gap-2 text-emerald-400 font-semibold text-xs uppercase tracking-wider">
+        <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-3">
+          <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold text-xs uppercase tracking-wider">
             <CheckCircle2 className="w-4 h-4" />
-            <span>Verified Green Flags ({greenFlags.length})</span>
+            <span>Verified Positive Evidence ({greenFlags.length})</span>
           </div>
           {greenFlags.length === 0 ? (
-            <p className="text-xs text-slate-500 italic">No standard green flags verified.</p>
+            <p className="text-xs text-slate-500 italic">No standard positive evidence verified.</p>
           ) : (
             <div className="space-y-1.5">
               {greenFlags.map((flag, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs text-slate-300 p-2 rounded-lg bg-emerald-950/20 border border-emerald-900/30">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"></span>
+                <div key={i} className="flex items-center gap-2 text-xs text-slate-800 dark:text-slate-300 p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/30">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                   <span>{flag}</span>
                 </div>
               ))}

@@ -1,5 +1,6 @@
 // WHOIS & Digital Identity Forensics Service - 100% Evidence-Grounded
 import { lookupRdapDomain, lookupDnsAuthRecords, checkTlsCertificate } from './networkCheckService.js';
+import { isThirdPartyOrPlatformDomain, THIRD_PARTY_OR_SHORTENER_DOMAINS } from './extractionService.js';
 
 const FREE_EMAIL_PROVIDERS = [
   'gmail.com', 'yahoo.com', 'yahoo.in', 'yahoo.co.in', 'outlook.com', 
@@ -19,20 +20,33 @@ const REPUTABLE_CORPORATE_DOMAINS = [
   { name: 'HCLTech', officialDomain: 'hcltech.com' }
 ];
 
-export async function analyzeEmailAndDomain(email, domain, claimedCompany) {
+export async function analyzeEmailAndDomain(email, domain, claimedCompany, flags = {}) {
   const cleanEmail = (email || '').trim().toLowerCase();
-  const cleanDomain = (domain || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/:\d+$/, '');
+  const rawDomain = (domain || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/:\d+$/, '');
   const emailDomain = cleanEmail.includes('@') ? cleanEmail.split('@')[1] : null;
-  const targetDomain = cleanDomain || (emailDomain && !FREE_EMAIL_PROVIDERS.includes(emailDomain) ? emailDomain : null);
+
+  // Never treat third-party platforms or free-mail as company's own domain
+  const isDomainThirdParty = isThirdPartyOrPlatformDomain(rawDomain);
+  const isDomainFreeMail = rawDomain && FREE_EMAIL_PROVIDERS.includes(rawDomain);
+  const cleanDomain = (!isDomainThirdParty && !isDomainFreeMail) ? rawDomain : null;
+
+  const emailIsFree = emailDomain ? FREE_EMAIL_PROVIDERS.includes(emailDomain) : false;
+  const emailIsThirdParty = emailDomain ? isThirdPartyOrPlatformDomain(emailDomain) : false;
+
+  const targetDomain = cleanDomain || (emailDomain && !emailIsFree && !emailIsThirdParty ? emailDomain : null);
 
   const results = {
-    domain: cleanDomain || emailDomain || null,
+    domain: targetDomain || null,
     claimedEmail: cleanEmail || null,
-    isFreeEmail: false,
+    isFreeEmail: emailIsFree || isDomainFreeMail,
     isTyposquatted: false,
     isDomainMismatch: false,
     mismatchDetails: null,
     spoofedTarget: null,
+    domainAge: (flags.informalMessagingChannel && !targetDomain)
+      ? 'Communication moved to an informal messaging channel'
+      : 'Not checked',
+    whoisRegistrar: 'Not checked',
     domainSanity: 'Standard',
     spoofingCheck: null,
     // Real network check outputs
@@ -42,20 +56,26 @@ export async function analyzeEmailAndDomain(email, domain, claimedCompany) {
   };
 
   // Check 1: Free Email Provider Check
-  if (emailDomain && FREE_EMAIL_PROVIDERS.includes(emailDomain)) {
-    results.isFreeEmail = true;
-    results.domainSanity = `CRITICAL WARNING: Communication sent from a free consumer mailbox (@${emailDomain}). Legitimate authorized enterprises operate on registered corporate domains.`;
+  if (results.isFreeEmail) {
+    const freeHost = emailDomain || rawDomain;
+    results.domainSanity = `CRITICAL WARNING: Communication sent from a free consumer mailbox (@${freeHost}). Legitimate authorized enterprises operate on registered corporate domains.`;
+    results.spoofingCheck = 'Not applicable (free email)';
+  } else if (flags.informalMessagingChannel && !targetDomain) {
+    results.domainSanity = 'Communication moved to an informal messaging channel';
+    results.spoofingCheck = 'Not applicable (informal messaging channel)';
   }
 
-  // Check 2: Typosquatting / Lookalike Check
-  const testString = `${cleanDomain || ''} ${emailDomain || ''}`.toLowerCase();
-  for (const corp of REPUTABLE_CORPORATE_DOMAINS) {
-    const brand = corp.officialDomain.split('.')[0];
-    if (testString.includes(brand) && !testString.endsWith(corp.officialDomain) && !corp.aliases?.some(a => testString.endsWith(a))) {
-      results.isTyposquatted = true;
-      results.spoofedTarget = corp.name;
-      results.spoofingCheck = `CRITICAL ALERT: Detected lookalike domain (${cleanDomain || emailDomain}) mimicking ${corp.name} (${corp.officialDomain}). Scammers frequently register hyphenated domains like '${brand}-careers.online' or '${brand}-hr.com' to deceive candidates.`;
-      break;
+  // Check 2: Typosquatting / Lookalike Check (only applicable for corporate domains, never free email)
+  if (!results.isFreeEmail && targetDomain) {
+    const testString = `${targetDomain} ${emailDomain || ''}`.toLowerCase();
+    for (const corp of REPUTABLE_CORPORATE_DOMAINS) {
+      const brand = corp.officialDomain.split('.')[0];
+      if (testString.includes(brand) && !testString.endsWith(corp.officialDomain) && !corp.aliases?.some(a => testString.endsWith(a))) {
+        results.isTyposquatted = true;
+        results.spoofedTarget = corp.name;
+        results.spoofingCheck = `CRITICAL ALERT: Detected lookalike domain (${targetDomain}) mimicking ${corp.name} (${corp.officialDomain}). Scammers frequently register hyphenated domains like '${brand}-careers.online' or '${brand}-hr.com' to deceive candidates.`;
+        break;
+      }
     }
   }
 
@@ -114,9 +134,12 @@ export async function analyzeEmailAndDomain(email, domain, claimedCompany) {
     if (rdapRes.status === 'fulfilled') {
       results.rdap = rdapRes.value;
       if (results.rdap.status === 'verified') {
+        results.whoisRegistrar = results.rdap.registrar || 'Unknown';
         if (results.rdap.isRecentlyRegistered) {
+          results.domainAge = `${results.rdap.ageInDays} days old`;
           results.domainSanity = `CRITICAL WARNING: Domain was registered ${results.rdap.ageInDays} days ago (${results.rdap.registrationDate?.split('T')[0]}). Recent domain registration under 90 days is a primary indicator of temporary phishing fronts.`;
         } else {
+          results.domainAge = `~${results.rdap.ageYears} years old`;
           results.domainSanity = `Verified Domain Age: Registered on ${results.rdap.registrationDate?.split('T')[0]} (~${results.rdap.ageYears} years ago via ${results.rdap.registrar}).`;
         }
       }

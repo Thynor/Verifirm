@@ -188,8 +188,98 @@ Google Campus Recruitment Team`;
     console.log('✓ Test 7 Passed: Extraction is 100% stateless.\n');
   }
 
+  // Test 8: Third-Party & Informal Messaging Channel (WhatsApp/Telegram link)
+  console.log('Running Test 8: Third-Party & Informal Messaging Channel (WhatsApp link)...');
+  {
+    const input = `From: hr-team@gmail.com
+Subject: Interview Selection
+Dear Candidate,
+Join our WhatsApp interview group: https://chat.whatsapp.com/ABC123XYZ
+Fill the form: https://docs.google.com/forms/d/e/1FAIpQLSc
+Regards,
+Recruiting Team`;
+
+    const extracted = extractEntitiesFromInput(input, 'text');
+    const result = await runComprehensiveAudit(extracted);
+
+    console.log('  Detected Domain:', extracted.detectedDomain);
+    console.log('  Informal channel flag:', extracted.flags.informalMessagingChannel);
+    console.log('  Domain Age value:', result.digitalIdentity.domainAge);
+    console.log('  RDAP Status:', result.digitalIdentity.rdap.status);
+
+    assert.notStrictEqual(extracted.detectedDomain, 'whatsapp.com', 'Must NEVER set whatsapp.com as detectedDomain');
+    assert.notStrictEqual(extracted.detectedDomain, 'google.com', 'Must NEVER set google.com as detectedDomain');
+    assert.strictEqual(extracted.flags.informalMessagingChannel, true, 'Must detect WhatsApp group link');
+    assert.strictEqual(result.digitalIdentity.domainAge, 'Communication moved to an informal messaging channel', 'Must show informal channel flag instead of domain age');
+    
+    const informalFlag = result.redFlags.find(r => r.rule.includes('informal messaging channel'));
+    assert(informalFlag, 'Must generate red flag for communication moved to informal channel');
+    assert.strictEqual(result.digitalIdentity.rdap.status, 'not_checked', 'Must not run RDAP on third-party platform links');
+    console.log('✓ Test 8 Passed: Third-party domains excluded and informal messaging flagged.\n');
+  }
+
+  // Test 9: Free-Mail Sender Lookalike Check ('Not applicable (free email)')
+  console.log('Running Test 9: Free-Mail Sender Lookalike Handling...');
+  {
+    const input = `From: google.recruitment.hr@gmail.com
+Subject: Job Offer
+Dear Applicant,
+Congratulations! You have an offer.
+Regards,
+Recruitment Team`;
+
+    const extracted = extractEntitiesFromInput(input, 'text');
+    const result = await runComprehensiveAudit(extracted);
+
+    console.log('  isFreeEmail:', result.digitalIdentity.isFreeEmail);
+    console.log('  spoofingCheck:', result.digitalIdentity.spoofingCheck);
+    console.log('  RDAP status:', result.digitalIdentity.rdap.status);
+
+    assert.strictEqual(result.digitalIdentity.isFreeEmail, true, 'Must detect free email');
+    assert.strictEqual(result.digitalIdentity.spoofingCheck, 'Not applicable (free email)', 'Lookalike check must be Not applicable (free email)');
+    assert.strictEqual(result.digitalIdentity.rdap.status, 'not_checked', 'Must not execute RDAP on free consumer mailbox');
+    console.log('✓ Test 9 Passed: Free email sender correctly handled with "Not applicable (free email)".\n');
+  }
+
+  // Test 10: Optional User-Provided Details Evaluation
+  console.log('Running Test 10: Optional User-Provided Details Processing...');
+  {
+    const input = `Subject: Senior Engineer Role at TechSolutions Inc\nDear Candidate...`;
+    const userProvided = {
+      companyAddress: 'Building 4, Cyber City, Gurugram, Haryana',
+      claimedEmployeeCount: 500,
+      linkedInEmployeeCount: 4,
+      linkedInCreatedYear: 2026,
+      ambitionBoxRating: 4.2,
+      financials: [
+        { year: '2020', revenue: 10, profit: 2 },
+        { year: '2024', revenue: 50, profit: 8 }
+      ]
+    };
+
+    const extracted = extractEntitiesFromInput(input, 'text', userProvided);
+    const result = await runComprehensiveAudit(extracted, userProvided);
+
+    console.log('  Physical Address:', result.physical.officeAddress);
+    console.log('  Physical Source:', result.physical.source);
+    console.log('  LinkedIn Claimed Count:', result.linkedin.claimedEmployeeCount);
+    console.log('  LinkedIn Count:', result.linkedin.linkedInEmployeeCount);
+    console.log('  Stocks Status:', result.stocks.status);
+    console.log('  Financial Growth Summary:', result.stocks.growthSummary);
+
+    assert.strictEqual(result.physical.officeAddress, 'Building 4, Cyber City, Gurugram, Haryana');
+    assert(result.physical.source.includes('user-provided'), 'Address source must indicate user-provided');
+    assert.strictEqual(result.linkedin.claimedEmployeeCount, 500);
+    assert.strictEqual(result.linkedin.linkedInEmployeeCount, 4);
+    assert(result.redFlags.some(r => r.rule.includes('Headcount Discrepancy')), 'Must generate headcount discrepancy flag');
+    assert(result.redFlags.some(r => r.rule.includes('Recent LinkedIn Page')), 'Must flag recent LinkedIn page creation');
+    assert.strictEqual(result.stocks.status, 'user_provided');
+    assert(result.stocks.growthSummary.includes('400%'), 'Must compute 400% revenue growth summary');
+    console.log('✓ Test 10 Passed: User-provided details correctly incorporated and labeled.\n');
+  }
+
   console.log('========================================');
-  console.log('ALL VERIFICATION TESTS COMPLETED SUCCESSFULLY (7/7 PASSED)');
+  console.log('ALL VERIFICATION TESTS COMPLETED SUCCESSFULLY (10/10 PASSED)');
   console.log('========================================');
 }
 

@@ -8,15 +8,15 @@ import { getCompanyFinancials } from './financeService.js';
 import { getRedditAndReviewSentiment } from './redditService.js';
 import { evaluateOfferLetterQuality } from './offerLetterService.js';
 
-function resolvePhysicalFootprint({ detectedAddress, detectedPhone, detectedEmail, detectedDomain }) {
+function resolvePhysicalFootprint({ detectedAddress, detectedPhone, detectedEmail, detectedDomain, isUserProvidedAddress = false }) {
   const checkedAt = new Date().toISOString();
 
   if (detectedAddress) {
     const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(detectedAddress)}`;
     return {
-      status: 'found_in_input',
+      status: isUserProvidedAddress ? 'user_provided' : 'found_in_input',
       officeAddress: detectedAddress,
-      source: 'Extracted from user input text',
+      source: isUserProvidedAddress ? 'Entered by user (user-provided)' : 'Extracted from user input text',
       checkedAt,
       mapUrl,
       contactDetails: {
@@ -24,7 +24,9 @@ function resolvePhysicalFootprint({ detectedAddress, detectedPhone, detectedEmai
         email: detectedEmail || 'Not specified',
         website: detectedDomain ? (detectedDomain.startsWith('http') ? detectedDomain : `https://${detectedDomain}`) : 'Not specified'
       },
-      message: 'Address extracted directly from input text. Click below to verify physical location on Google Maps.'
+      message: isUserProvidedAddress
+        ? 'Address entered directly by user. Click below to verify physical location on Google Maps.'
+        : 'Address extracted directly from input text. Click below to verify physical location on Google Maps.'
     };
   }
 
@@ -43,7 +45,7 @@ function resolvePhysicalFootprint({ detectedAddress, detectedPhone, detectedEmai
   };
 }
 
-export async function runComprehensiveAudit(extractedData) {
+export async function runComprehensiveAudit(extractedData, userProvidedDetails = null) {
   const {
     rawText,
     isOfferLetter,
@@ -59,8 +61,10 @@ export async function runComprehensiveAudit(extractedData) {
     flags = {}
   } = extractedData;
 
+  const details = userProvidedDetails || extractedData.userProvidedDetails || null;
+
   // 1. Asynchronous Digital Forensics (RDAP, DNS, TLS, Domain Mismatch)
-  const digitalIdentity = await analyzeEmailAndDomain(detectedEmail, detectedDomain, detectedCompanyName);
+  const digitalIdentity = await analyzeEmailAndDomain(detectedEmail, detectedDomain, detectedCompanyName, flags);
 
   // 2. Government & Corporate Registry
   const government = lookupGovernmentRegistry(detectedCompanyName, cin, gstin);
@@ -77,12 +81,13 @@ export async function runComprehensiveAudit(extractedData) {
   // 6. Real Reddit Community Discussions (no fake stars/reviews)
   const redditAndReviews = await getRedditAndReviewSentiment(detectedCompanyName);
 
-  // 7. Physical Footprint & Map: Address ONLY from input
+  // 7. Physical Footprint & Map: Address ONLY from input or user-provided
   const physical = resolvePhysicalFootprint({
     detectedAddress,
     detectedPhone,
     detectedEmail,
-    detectedDomain
+    detectedDomain,
+    isUserProvidedAddress: !!(details?.companyAddress)
   });
 
   // 8. Concrete Rules & Checks Performed Tracking
@@ -249,6 +254,90 @@ export async function runComprehensiveAudit(extractedData) {
     });
   }
 
+  // Check 9: Informal Messaging Channel (WhatsApp / Telegram)
+  if (flags.informalMessagingChannel) {
+    const quote = flags.informalChannelSnippet ? `Found in text: "${flags.informalChannelSnippet}"` : '';
+    redFlags.push({
+      rule: 'Communication moved to an informal messaging channel',
+      severity: 'HIGH',
+      description: `Communication directs recruitment or selection to WhatsApp or Telegram rather than official corporate portals or email. ${quote}`.trim()
+    });
+  }
+
+  // Check 10: Ingest User-Provided Details (Strictly labeled "user-provided")
+  if (details) {
+    if (details.claimedEmployeeCount || details.linkedInEmployeeCount) {
+      linkedin.status = 'user_provided';
+      linkedin.source = 'Entered by user (user-provided)';
+      linkedin.claimedEmployeeCount = details.claimedEmployeeCount ? parseInt(details.claimedEmployeeCount, 10) : null;
+      linkedin.linkedInEmployeeCount = details.linkedInEmployeeCount ? parseInt(details.linkedInEmployeeCount, 10) : null;
+
+      if (linkedin.claimedEmployeeCount && linkedin.linkedInEmployeeCount) {
+        const claimed = linkedin.claimedEmployeeCount;
+        const li = linkedin.linkedInEmployeeCount;
+        if (claimed >= 3 * li && claimed >= 30) {
+          redFlags.push({
+            rule: 'Headcount Discrepancy [user-provided]',
+            severity: 'HIGH',
+            description: `Claimed employee count (${claimed}) is significantly higher than LinkedIn employee count (${li}) [user-provided]. Potential inflation or unverified corporate scale.`
+          });
+        } else {
+          greenFlags.push(`Headcount comparison: Claimed (${claimed}) vs LinkedIn (${li}) [user-provided]`);
+        }
+      }
+    }
+
+    if (details.linkedInCreatedYear) {
+      const yr = parseInt(details.linkedInCreatedYear, 10);
+      linkedin.createdYear = yr;
+      linkedin.source = 'Entered by user (user-provided)';
+      const pageAge = new Date().getFullYear() - yr;
+      if (pageAge < 1) {
+        redFlags.push({
+          rule: 'Recent LinkedIn Page (< 1 Year) [user-provided]',
+          severity: 'HIGH',
+          description: `LinkedIn company page created recently in ${yr} [user-provided]. Newly formed social profiles for established organizations indicate imposter recruitment risk.`
+        });
+      } else {
+        greenFlags.push(`LinkedIn page established: Created in ${yr} (~${pageAge} years ago) [user-provided]`);
+      }
+    }
+
+    if (details.ambitionBoxRating || details.glassdoorRating) {
+      redditAndReviews.userProvidedRatings = {
+        ambitionBoxRating: details.ambitionBoxRating ? parseFloat(details.ambitionBoxRating) : null,
+        ambitionBoxReviews: details.ambitionBoxReviews ? parseInt(details.ambitionBoxReviews, 10) : null,
+        glassdoorRating: details.glassdoorRating ? parseFloat(details.glassdoorRating) : null,
+        glassdoorReviews: details.glassdoorReviews ? parseInt(details.glassdoorReviews, 10) : null,
+        source: 'Entered by user (user-provided)'
+      };
+      greenFlags.push('Candidate review ratings recorded [user-provided]');
+    }
+
+    if (details.financials && Array.isArray(details.financials)) {
+      const validRows = details.financials.filter(r => r.year && (r.revenue !== undefined || r.profit !== undefined));
+      if (validRows.length > 0) {
+        stocks.status = 'user_provided';
+        stocks.source = 'Entered by user (user-provided)';
+        stocks.userProvidedFinancials = validRows;
+
+        const revs = validRows.map(r => Number(r.revenue)).filter(n => !isNaN(n));
+        let growthSummary = '5-year financial breakdown entered by user.';
+        if (revs.length >= 2) {
+          const initialRev = revs[0];
+          const latestRev = revs[revs.length - 1];
+          if (initialRev > 0) {
+            const pct = Math.round(((latestRev - initialRev) / initialRev) * 100);
+            growthSummary = `Revenue ${pct >= 0 ? 'grew by ' + pct + '%' : 'declined by ' + Math.abs(pct) + '%'} from ${validRows[0].year} to ${validRows[validRows.length - 1].year} [user-provided].`;
+          }
+        }
+        stocks.growthSummary = growthSummary;
+        stocks.message = growthSummary;
+        greenFlags.push(`Financial data supplied: ${growthSummary}`);
+      }
+    }
+  }
+
   // Derive 5 Golden Rules - 100% Derived from Detection Results
   // Each rule has 3 states: passed === true (Passed), passed === false (Failed), passed === null (Not checked)
   let rule1Passed = null;
@@ -402,6 +491,42 @@ export async function runComprehensiveAudit(extractedData) {
     badgeColor = 'amber';
   }
 
+  // Top 3 concrete reasons quoting the mail or primary evidence
+  const topReasons = [];
+  for (const rf of redFlags) {
+    if (topReasons.length >= 3) break;
+    topReasons.push({
+      rule: rf.rule,
+      severity: rf.severity,
+      description: rf.description
+    });
+  }
+  if (topReasons.length === 0) {
+    for (const gf of greenFlags.slice(0, 3)) {
+      topReasons.push({
+        rule: 'Verified Evidence',
+        severity: 'PASSED',
+        description: gf
+      });
+    }
+  }
+
+  // Plain-language actionable advice
+  const adviceList = [];
+  if (hasCriticalRedFlag || hasHighRedFlag) {
+    adviceList.push('Do NOT pay any money, security deposits, courier charges, or registration fees.');
+    adviceList.push('Do NOT share Aadhaar, PAN card, passport, or bank details over WhatsApp or Telegram.');
+    adviceList.push('Do NOT install remote desktop tools (AnyDesk, TeamViewer) or unknown APK files.');
+    adviceList.push('Verify the job opening directly by searching for the official company careers website.');
+  } else if (verdict === 'VERIFIED') {
+    adviceList.push('Corporate identity and statutory registration verified against official government records.');
+    adviceList.push('Always complete contracts and onboarding on secure official company portals.');
+  } else {
+    adviceList.push('Look up the company on the Ministry of Corporate Affairs portal (mca.gov.in) to verify registration.');
+    adviceList.push('Ask the recruiter to email you from their official corporate domain address (@company.com).');
+    adviceList.push('Check LinkedIn to confirm the recruiter is genuinely employed by the stated organization.');
+  }
+
   return {
     companyName: detectedCompanyName,
     claimedDomain: detectedDomain,
@@ -413,6 +538,8 @@ export async function runComprehensiveAudit(extractedData) {
     coverageRatio,
     checksAudit,
     goldenRules,
+    topReasons,
+    adviceList,
     redFlags,
     greenFlags,
     digitalIdentity,
@@ -422,6 +549,7 @@ export async function runComprehensiveAudit(extractedData) {
     offerLetterQuality,
     physical,
     redditAndReviews,
+    userProvidedDetails: details,
     legalDisclaimer: 'Disclaimer: VeriFirm assessment results are risk indicators based on available evidence and do not constitute legal proof or corporate certification.',
     timestamp: new Date().toISOString()
   };
