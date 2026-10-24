@@ -5,21 +5,23 @@ import {
 } from 'lucide-react';
 
 export function DashboardHeader({ data, onReset }) {
-  const score = data.trustScore || 0;
-  const isHighRisk = data.verdict?.includes('CRITICAL RISK') || score < 40;
-  const isVerified = data.verdict?.includes('VERIFIED LEGITIMATE');
-  const isInsufficient = data.verdict?.includes('UNVERIFIED') || (!isHighRisk && !isVerified);
+  const score = data.trustScore;
+  const hasEnoughData = data.hasEnoughData !== false && score !== null && score !== undefined;
+  const isHighRisk = data.verdict?.includes('CRITICAL RISK') || (hasEnoughData && score < 40);
+  const isVerified = data.verdict === 'VERIFIED';
+  const isNoRedFlags = data.verdict?.includes('No red flags found');
+  const isInsufficient = !hasEnoughData || data.verdict?.includes('UNVERIFIED');
 
   // Determine score color
-  const strokeColor = isHighRisk ? '#f43f5e' : isVerified ? '#10b981' : '#f59e0b';
+  const strokeColor = isHighRisk ? '#f43f5e' : (isVerified || isNoRedFlags) ? '#10b981' : '#f59e0b';
   const badgeBg = isHighRisk 
     ? 'bg-rose-950/80 border-rose-800 text-rose-300' 
-    : isVerified 
+    : (isVerified || isNoRedFlags)
       ? 'bg-emerald-950/80 border-emerald-800 text-emerald-300' 
       : 'bg-amber-950/80 border-amber-800 text-amber-300';
 
   const circumference = 2 * Math.PI * 42;
-  const strokeDashoffset = circumference - (score / 100) * circumference;
+  const strokeDashoffset = hasEnoughData ? (circumference - (score / 100) * circumference) : circumference;
 
   return (
     <div className="space-y-6">
@@ -134,39 +136,68 @@ export function DashboardHeader({ data, onReset }) {
                   fill="transparent"
                 />
                 {/* Progress Arc */}
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="42"
-                  stroke={strokeColor}
-                  strokeWidth="8"
-                  strokeLinecap="round"
-                  fill="transparent"
-                  strokeDasharray={circumference}
-                  strokeDashoffset={strokeDashoffset}
-                  className="transition-all duration-1000 ease-out"
-                />
+                {hasEnoughData ? (
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="42"
+                    stroke={strokeColor}
+                    strokeWidth="8"
+                    strokeLinecap="round"
+                    fill="transparent"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={strokeDashoffset}
+                    className="transition-all duration-1000 ease-out"
+                  />
+                ) : (
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="42"
+                    stroke="#475569"
+                    strokeWidth="8"
+                    strokeDasharray="4 6"
+                    fill="transparent"
+                  />
+                )}
               </svg>
               {/* Score Inside */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-2xl font-black text-white font-mono">{score}</span>
-                <span className="text-[10px] uppercase font-mono text-slate-400">Trust Score</span>
+              <div className="absolute inset-0 flex flex-col items-center justify-center p-2 text-center">
+                {hasEnoughData ? (
+                  <>
+                    <span className="text-2xl font-black text-white font-mono">{score}</span>
+                    <span className="text-[10px] uppercase font-mono text-slate-400">Trust Score</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-xs font-bold text-slate-300 font-mono leading-tight">Not enough data</span>
+                    <span className="text-[9px] uppercase font-mono text-slate-500 mt-0.5">Trust Score</span>
+                  </>
+                )}
               </div>
             </div>
             <span className="text-[11px] font-mono mt-2 text-slate-400 text-center">
-              {isHighRisk ? 'Concrete Scam Triggered' : isVerified ? 'Verified Evidence' : 'Insufficient Evidence'}
+              {isHighRisk ? 'Concrete Scam Triggered' : isVerified ? 'Verified Evidence' : isNoRedFlags ? 'No Red Flags' : 'Insufficient Evidence'}
             </span>
             {data.coverageRatio && (
-              <span className="text-[10px] font-mono text-cyan-400 mt-1">
+              <span className="text-[11px] font-mono text-cyan-400 mt-1 font-semibold">
                 {data.coverageRatio}
               </span>
             )}
           </div>
         </div>
 
+        {/* Legal Disclaimer Banner */}
+        <div className="mt-6 p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 text-slate-400 text-xs flex items-center gap-2.5">
+          <HelpCircle className="w-4 h-4 text-cyan-400 shrink-0" />
+          <span className="leading-relaxed">
+            <strong>Disclaimer:</strong> VeriFirm assessment results are risk indicators based on available evidence and do not constitute legal proof or corporate certification.
+          </span>
+        </div>
+
         {/* Critical Scam Banner Alert (if upfront money requested) */}
         {data.redFlags?.some(r => r.rule.includes('Upfront Fee')) && (
-          <div className="mt-6 p-4 rounded-xl bg-rose-950/60 border border-rose-800/80 text-rose-200 flex items-start gap-3">
+          <div className="mt-4 p-4 rounded-xl bg-rose-950/60 border border-rose-800/80 text-rose-200 flex items-start gap-3">
             <AlertOctagon className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
             <div className="space-y-1 text-xs">
               <h4 className="font-bold text-rose-300 text-sm">

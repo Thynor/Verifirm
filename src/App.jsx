@@ -89,11 +89,15 @@ export default function App() {
     fetch(`/api/presets/${presetId}`)
       .then(res => res.json())
       .then(data => {
-        setPendingResult(data);
+        setAnalysisData(data);
+        setPage('dashboard');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       })
       .catch(() => {
         const found = BENCHMARK_PRESETS.find(p => p.id === presetId);
-        setPendingResult(found || BENCHMARK_PRESETS[0]);
+        setAnalysisData(found || BENCHMARK_PRESETS[0]);
+        setPage('dashboard');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       });
   };
 
@@ -122,29 +126,31 @@ export default function App() {
       });
       if (response.ok) {
         const data = await response.json();
-        setPendingResult(data);
+        setAnalysisData(data);
+        setPage('dashboard');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
         throw new Error('API analysis failed');
       }
     } catch (err) {
       console.error('API analysis error:', err);
-      setPendingResult({
-        companyName: payload.content ? payload.content.slice(0, 50).trim() : 'Unspecified Organization',
-        trustScore: 40,
+      const fallbackResult = {
+        companyName: payload.content ? payload.content.slice(0, 50).trim() : 'Unspecified',
+        trustScore: null,
+        hasEnoughData: false,
         verdict: 'UNVERIFIED – insufficient evidence',
         summaryVerdict: 'Analysis server communication failed or is offline. Please ensure the backend server is running.',
-        coverage: {
-          performedChecks: 0,
-          totalChecks: 8,
-          ratio: '0 of 8 checks performed'
+        coverageRatio: '0 of 8 checks performed',
+        checksAudit: [],
+        goldenRules: {
+          rules: [
+            { id: 'rule1', title: 'Rule #1: They NEVER Ask for Money', subtitle: 'Laptop deposits, training fees, courier charges, registration deposits', passed: null, status: 'Not checked', details: 'Offline fallback mode.' },
+            { id: 'rule2', title: 'Rule #2: Secure Document Handling', subtitle: 'Never ask for Aadhaar, PAN, or Bank passbook over WhatsApp/Telegram', passed: null, status: 'Not checked', details: 'Offline fallback mode.' },
+            { id: 'rule3', title: 'Rule #3: Official Corporate Email Domain', subtitle: 'Authorized entities communicate from @company.com, never free consumer accounts', passed: null, status: 'Not checked', details: 'Offline fallback mode.' },
+            { id: 'rule4', title: 'Rule #4: Standard Recruitment Timeline', subtitle: 'No artificial psychological pressure (e.g., "Pay within 2 hours or offer rescinded")', passed: null, status: 'Not checked', details: 'Offline fallback mode.' },
+            { id: 'rule5', title: 'Rule #5: Realistic Compensation Package', subtitle: 'Salary aligns with market rates for the specific role without bait-and-switch tactics', passed: null, status: 'Not checked', details: 'Offline fallback mode.' }
+          ]
         },
-        goldenRules: [
-          { id: 'payment', title: 'Zero Mandatory Upfront Fee Demand', status: 'Unchecked', passed: null, details: 'Offline fallback mode.' },
-          { id: 'email_domain', title: 'Cryptographic Domain Alignment', status: 'Unchecked', passed: null, details: 'Offline fallback mode.' },
-          { id: 'offer_validity', title: 'Legitimate Offer Letter Validation', status: 'Unchecked', passed: null, details: 'Offline fallback mode.' },
-          { id: 'interview_process', title: 'Formal Multi-Round Interview Validation', status: 'Unchecked', passed: null, details: 'Offline fallback mode.' },
-          { id: 'equipment_scam', title: 'No Counterfeit Cheque or Device Takeover', status: 'Unchecked', passed: null, details: 'Offline fallback mode.' }
-        ],
         redFlags: ['Backend verification server was unreachable.'],
         greenFlags: [],
         digitalIdentity: {
@@ -187,12 +193,16 @@ export default function App() {
           searchUrl: 'https://www.reddit.com',
           message: 'Server unreachable.'
         },
-        offerLetterQuality: null
-      });
+        offerLetterQuality: null,
+        legalDisclaimer: 'Disclaimer: VeriFirm assessment results are risk indicators based on available evidence and do not constitute legal proof or corporate certification.'
+      };
+      setAnalysisData(fallbackResult);
+      setPage('dashboard');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
-  // When loading animation completes
+  // Immediate completion fallback
   const handleLoadingComplete = () => {
     if (pendingResult) {
       setAnalysisData(pendingResult);
@@ -296,6 +306,7 @@ export default function App() {
       {/* Footer */}
       <footer className="border-t border-slate-900 bg-[#04070d] py-6 px-4 text-center text-xs text-slate-500 font-mono">
         <p>VeriFirm Evidence-Based Corporate & Scam Intelligence • Public Interest Scam Prevention</p>
+        <p className="mt-1 text-[11px] text-slate-400"><strong>Legal Disclaimer:</strong> VeriFirm assessment results are risk indicators based on available evidence and do not constitute legal proof or corporate certification.</p>
         <p className="mt-1 text-[11px] text-slate-600">Checks performed using input text analysis, RDAP, DNS & TLS network verification. Official registry links provided for manual verification.</p>
       </footer>
 

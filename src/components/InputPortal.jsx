@@ -238,7 +238,7 @@ export function InputPortal({
               <textarea
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
-                placeholder="Example: 'From: hr@... Dear Candidate, congratulations on being selected for Systems Engineer at TCS. Monthly compensation: ₹65,000. Please deposit ₹8,500 for company laptop courier via PhonePe to UPI...'"
+                placeholder="Example: 'From: hr@example.com... Dear Candidate, congratulations on being selected for Systems Engineer at Acme Technologies. Monthly compensation: ₹65,000. Please deposit ₹8,500 for company laptop courier via PhonePe to UPI...'"
                 rows={6}
                 className="w-full bg-[#080d19] border border-slate-700/80 rounded-xl p-4 text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 font-mono transition-all resize-y"
               />
@@ -363,7 +363,7 @@ export function InputPortal({
                   type="url"
                   value={inputUrl}
                   onChange={(e) => setInputUrl(e.target.value)}
-                  placeholder="e.g. https://tcs.com or https://linkedin.com/company/tcs or https://acrobyte-global-solutions.io"
+                  placeholder="e.g. https://example.com or https://linkedin.com/company/example"
                   className="w-full bg-[#080d19] border border-slate-700/80 rounded-xl px-4 py-3.5 pl-11 text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all font-mono"
                 />
                 <Link2 className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />

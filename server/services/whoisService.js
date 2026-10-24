@@ -78,6 +78,29 @@ export async function analyzeEmailAndDomain(email, domain, claimedCompany) {
         }
       }
     }
+
+    // Generalized domain mismatch for any claimed company
+    if (!results.isDomainMismatch && !results.isFreeEmail && normClaim !== 'unspecified') {
+      if (cleanDomain && cleanDomain !== emailDomain && !emailDomain.endsWith('.' + cleanDomain) && !cleanDomain.endsWith('.' + emailDomain)) {
+        results.isDomainMismatch = true;
+        results.spoofedTarget = claimedCompany;
+        results.mismatchDetails = `CRITICAL DOMAIN MISMATCH: Communication claims to represent ${claimedCompany} (${cleanDomain}), but sender email originates from an unauthorized domain (@${emailDomain}).`;
+        results.spoofingCheck = results.mismatchDetails;
+        results.domainSanity = `CRITICAL FAILURE: Sender domain (@${emailDomain}) does not match organization domain (${cleanDomain}).`;
+      } else if (!cleanDomain) {
+        const stopWords = new Set(['technologies', 'technology', 'solutions', 'private', 'pvt', 'limited', 'ltd', 'llp', 'inc', 'corp', 'corporation', 'services', 'systems', 'enterprises', 'group', 'india', 'global', 'labs']);
+        const distinctiveTokens = normClaim.split(/[\s,.-]+/).filter(w => w.length >= 4 && !stopWords.has(w));
+        const domainTokens = emailDomain.split(/[\s,.-]+/);
+        const hasTokenMatch = distinctiveTokens.some(token => emailDomain.includes(token) || domainTokens.some(dt => dt.includes(token)));
+        if (distinctiveTokens.length > 0 && !hasTokenMatch) {
+          results.isDomainMismatch = true;
+          results.spoofedTarget = claimedCompany;
+          results.mismatchDetails = `CRITICAL SENDER MISMATCH: Communication claims to represent ${claimedCompany}, but sender email originates from an unrelated domain (@${emailDomain}).`;
+          results.spoofingCheck = results.mismatchDetails;
+          results.domainSanity = `CRITICAL WARNING: Sender domain (@${emailDomain}) has no evident affiliation with claimed employer ${claimedCompany}.`;
+        }
+      }
+    }
   }
 
   // Check 4: Real Network Lookups (RDAP, DNS, TLS)

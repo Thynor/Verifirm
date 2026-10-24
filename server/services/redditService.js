@@ -8,7 +8,7 @@ export async function getRedditAndReviewSentiment(companyName) {
     : 'https://www.reddit.com';
   const checkedAt = new Date().toISOString();
 
-  if (!cleanName || cleanName.toLowerCase() === 'unspecified organization') {
+  if (!cleanName || cleanName.toLowerCase() === 'unspecified organization' || cleanName.toLowerCase() === 'unspecified') {
     return {
       status: 'not_checked',
       source: null,
