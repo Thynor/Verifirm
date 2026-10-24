@@ -376,7 +376,7 @@ export default function App() {
   const unrunChecks = getUnrunChecks();
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#060a14] text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
+    <div className="min-h-screen text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
       <Navbar 
         onReset={handleReset} 
         currentUser={currentUser}
@@ -431,7 +431,7 @@ export default function App() {
 
             {/* 4. Detailed Checks as Collapsible Sections */}
             <div className="space-y-4 pt-2">
-              <h2 className="text-base font-bold text-slate-900 dark:text-white uppercase tracking-wider px-1">
+              <h2 className="text-base font-bold text-vfslate dark:text-mist uppercase tracking-wider px-1">
                 {t.detailedChecksTitle}
               </h2>
 
@@ -461,47 +461,47 @@ export default function App() {
 
             {/* 5. A Single Collapsed Section: "Checks we couldn't run" */}
             {unrunChecks.length > 0 && (
-              <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#091020] shadow-sm overflow-hidden">
+              <div className="vf-card overflow-hidden">
                 <button
                   type="button"
                   onClick={() => toggleSection('unrun')}
-                  className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors text-left"
+                  className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-violet/5 dark:hover:bg-violet/10 transition-colors text-left"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
+                    <div className="w-9 h-9 rounded-xl bg-violet/15 dark:bg-violet/25 border border-violet/30 flex items-center justify-center text-violet dark:text-lavender shrink-0">
                       <HelpCircle className="w-4 h-4" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white">
+                      <h3 className="font-bold text-sm sm:text-base text-vfslate dark:text-mist">
                         {t.unrunChecksTitle} ({unrunChecks.length})
                       </h3>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                      <p className="text-xs text-muted dark:text-lavender/80">
                         {t.unrunChecksSubtitle}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800">
+                    <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-mist dark:bg-slate-800 text-vfslate dark:text-mist border border-slate-300/40 dark:border-slate-700">
                       {expandedSections.unrun ? 'Hide' : 'Click to View'}
                     </span>
-                    {expandedSections.unrun ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+                    {expandedSections.unrun ? <ChevronUp className="w-5 h-5 text-muted dark:text-lavender/70" /> : <ChevronDown className="w-5 h-5 text-muted dark:text-lavender/70" />}
                   </div>
                 </button>
                 {expandedSections.unrun && (
-                  <div className="p-4 sm:p-6 border-t border-slate-200 dark:border-slate-800/80 space-y-3">
+                  <div className="p-4 sm:p-6 border-t border-slate-200/60 dark:border-slate-700/60 space-y-3">
                     {unrunChecks.map((item, idx) => (
-                      <div key={idx} className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 space-y-1.5 text-xs">
-                        <div className="flex items-center justify-between font-semibold text-slate-900 dark:text-white">
+                      <div key={idx} className="vf-inner-card p-3.5 space-y-1.5 text-xs">
+                        <div className="flex items-center justify-between font-semibold text-vfslate dark:text-mist">
                           <span>{item.name}</span>
-                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-mist dark:bg-slate-800 text-muted dark:text-lavender/80 border border-slate-300/30 dark:border-slate-700">
                             {t.noDataNotChecked}
                           </span>
                         </div>
-                        <p className="text-slate-600 dark:text-slate-400">
+                        <p className="text-muted dark:text-mist/90">
                           {item.reason}
                         </p>
-                        <div className="pt-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-slate-700 dark:text-slate-300">
-                          <span className="font-medium text-cyan-800 dark:text-cyan-400">
+                        <div className="pt-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <span className="font-medium text-violet dark:text-lavender">
                             💡 How to check yourself: {item.tip}
                           </span>
                           {item.link && (
@@ -509,7 +509,7 @@ export default function App() {
                               href={item.link} 
                               target="_blank" 
                               rel="noopener noreferrer" 
-                              className="inline-flex items-center gap-1 font-semibold text-blue-600 dark:text-cyan-400 hover:underline shrink-0"
+                              className="inline-flex items-center gap-1 font-semibold text-violet dark:text-lavender hover:underline shrink-0"
                             >
                               <span>Official Verification Link</span>
                               <ExternalLink className="w-3.5 h-3.5" />
@@ -524,12 +524,12 @@ export default function App() {
             )}
 
             {/* 6. Action Buttons Bar at bottom of report */}
-            <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#091020] border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+            <div className="vf-card p-5 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
-                <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                <h4 className="text-sm font-bold text-vfslate dark:text-mist">
                   Need to save or report this result?
                 </h4>
-                <p className="text-xs text-slate-600 dark:text-slate-400">
+                <p className="text-xs text-muted dark:text-lavender/80">
                   Export as PDF, copy the text summary to your clipboard, or file an alert on the National Cybercrime portal.
                 </p>
               </div>
@@ -538,18 +538,18 @@ export default function App() {
                 <button
                   type="button"
                   onClick={handleCopyReportBottom}
-                  className="flex items-center justify-center gap-1.5 text-xs font-semibold px-4 py-2.5 min-h-[44px] rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 transition-colors border border-slate-200 dark:border-slate-700 flex-1 sm:flex-initial"
+                  className="vf-btn-secondary px-4 py-2.5 min-h-[44px] text-xs inline-flex items-center justify-center gap-1.5 flex-1 sm:flex-initial"
                 >
-                  {copiedBottom ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-slate-500" />}
+                  {copiedBottom ? <Check className="w-4 h-4 text-status-success" /> : <Copy className="w-4 h-4 text-muted dark:text-lavender/70" />}
                   <span>{copiedBottom ? 'Copied!' : t.copyBtn}</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => window.print()}
-                  className="flex items-center justify-center gap-1.5 text-xs font-semibold px-4 py-2.5 min-h-[44px] rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 transition-colors border border-slate-200 dark:border-slate-700 flex-1 sm:flex-initial"
+                  className="vf-btn-secondary px-4 py-2.5 min-h-[44px] text-xs inline-flex items-center justify-center gap-1.5 flex-1 sm:flex-initial"
                 >
-                  <Printer className="w-4 h-4 text-slate-500" />
+                  <Printer className="w-4 h-4 text-muted dark:text-lavender/70" />
                   <span>{t.exportBtn}</span>
                 </button>
 
@@ -557,7 +557,7 @@ export default function App() {
                   href="https://cybercrime.gov.in"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-1.5 text-xs font-semibold px-4 py-2.5 min-h-[44px] rounded-xl bg-rose-600 hover:bg-rose-500 text-white transition-colors shadow-md flex-1 sm:flex-initial"
+                  className="inline-flex items-center justify-center gap-1.5 text-xs font-semibold px-4 py-2.5 min-h-[44px] rounded-xl bg-status-danger hover:bg-[#a72020] text-white transition-colors shadow-md flex-1 sm:flex-initial"
                 >
                   <ShieldAlert className="w-4 h-4" />
                   <span>{t.reportScamBtn}</span>
@@ -569,12 +569,12 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-200 dark:border-slate-900 bg-white dark:bg-[#04070d] py-6 px-4 text-center text-xs text-slate-600 dark:text-slate-500 transition-colors">
-        <p className="font-semibold text-slate-800 dark:text-slate-400">VeriFirm Evidence-Based Corporate & Scam Intelligence</p>
-        <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+      <footer className="border-t border-slate-300/40 dark:border-slate-800 bg-[#494D5F] py-6 px-4 text-center text-xs text-white transition-colors">
+        <p className="font-semibold text-white">VeriFirm Evidence-Based Corporate & Scam Intelligence</p>
+        <p className="mt-1 text-[11px] text-lavender/90">
           <strong>Legal Disclaimer:</strong> VeriFirm assessment results are risk indicators based on available evidence and do not constitute legal proof or corporate certification.
         </p>
-        <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-600">
+        <p className="mt-1 text-[11px] text-lavender/80">
           Checks performed using input text analysis, RDAP, DNS & TLS network verification. Official registry links provided for manual verification.
         </p>
       </footer>

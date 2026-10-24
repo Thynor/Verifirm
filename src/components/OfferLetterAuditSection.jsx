@@ -27,30 +27,30 @@ export function OfferLetterAuditSection({ offerLetterQuality = {}, defaultExpand
   };
 
   return (
-    <div className="rounded-2xl bg-white dark:bg-[#091020] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+    <div className="vf-card overflow-hidden">
       {/* Collapsible Section Header */}
       <div 
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-900/40 transition-colors"
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 cursor-pointer hover:bg-violet/5 dark:hover:bg-violet/10 transition-colors"
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-teal-50 dark:bg-teal-600/20 border border-teal-200 dark:border-teal-500/40 flex items-center justify-center text-teal-600 dark:text-teal-400 shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-violet/15 dark:bg-violet/25 border border-violet/30 flex items-center justify-center text-violet dark:text-lavender shrink-0">
             <FileCheck2 className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <h2 className="text-base sm:text-lg font-bold text-vfslate dark:text-mist flex items-center gap-2">
               <span>Offer Letter Document Text Analysis</span>
               <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${
                 qualityPercentage >= 80 
-                  ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' 
+                  ? 'bg-status-success/10 text-status-success border-status-success/30 font-bold' 
                   : qualityPercentage >= 50
-                    ? 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800'
-                    : 'bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800'
+                    ? 'bg-status-warning/10 text-status-warning border-status-warning/30 font-bold'
+                    : 'bg-status-danger/10 text-status-danger border-status-danger/30 font-bold'
               }`}>
                 {verdict}
               </span>
             </h2>
-            <p className="text-xs text-slate-600 dark:text-slate-400">
+            <p className="text-xs text-muted dark:text-lavender/80">
               Examining authorized signatures, mandatory statutory CIN, template authenticity, and salary/role alignment
             </p>
           </div>
@@ -58,11 +58,11 @@ export function OfferLetterAuditSection({ offerLetterQuality = {}, defaultExpand
 
         <div className="flex items-center gap-3 self-end sm:self-center" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500 dark:text-slate-400">Score:</span>
-            <span className={`text-xs font-mono font-bold px-2.5 py-1 rounded-md ${
-              qualityPercentage >= 80 ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' :
-              qualityPercentage >= 50 ? 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800' :
-              'bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800'
+            <span className="text-xs text-muted dark:text-lavender/80">Score:</span>
+            <span className={`text-xs font-mono font-bold px-2.5 py-1 rounded-md border ${
+              qualityPercentage >= 80 ? 'bg-status-success/10 text-status-success border-status-success/30' :
+              qualityPercentage >= 50 ? 'bg-status-warning/10 text-status-warning border-status-warning/30' :
+              'bg-status-danger/10 text-status-danger border-status-danger/30'
             }`}>
               {qualityPercentage} / 100
             </span>
@@ -71,7 +71,7 @@ export function OfferLetterAuditSection({ offerLetterQuality = {}, defaultExpand
           <button
             type="button"
             onClick={() => setIsExpanded(!isExpanded)}
-            className="p-2 rounded-lg text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="p-2 rounded-lg text-muted hover:text-vfslate dark:text-lavender/70 dark:hover:text-mist hover:bg-slate-200/50 dark:hover:bg-slate-700/50 transition-colors"
             aria-label={isExpanded ? "Collapse section" : "Expand section"}
           >
             {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
@@ -81,7 +81,7 @@ export function OfferLetterAuditSection({ offerLetterQuality = {}, defaultExpand
 
       {/* Expanded 6 Checks Grid */}
       {isExpanded && (
-        <div className="p-5 sm:p-6 border-t border-slate-200 dark:border-slate-800">
+        <div className="p-5 sm:p-6 border-t border-slate-200/60 dark:border-slate-700/60">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {checks.map((check) => {
               const Icon = getCheckIcon(check.id);
@@ -90,30 +90,30 @@ export function OfferLetterAuditSection({ offerLetterQuality = {}, defaultExpand
                   key={check.id}
                   className={`p-4 rounded-xl border space-y-2 transition-all ${
                     check.passed
-                      ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/40'
-                      : 'bg-rose-50/50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900/60'
+                      ? 'bg-status-success/10 border-status-success/25 dark:bg-status-success/15 dark:border-status-success/30'
+                      : 'bg-status-danger/10 border-status-danger/25 dark:bg-status-danger/15 dark:border-status-danger/30'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <Icon className={`w-4 h-4 ${check.passed ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`} />
-                      <span className="text-xs font-bold text-slate-900 dark:text-white">{check.title}</span>
+                      <Icon className={`w-4 h-4 ${check.passed ? 'text-status-success' : 'text-status-danger'}`} />
+                      <span className="text-xs font-bold text-vfslate dark:text-mist">{check.title}</span>
                     </div>
                     {check.passed ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <CheckCircle2 className="w-4 h-4 text-status-success shrink-0" />
                     ) : (
-                      <XCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                      <XCircle className="w-4 h-4 text-status-danger shrink-0" />
                     )}
                   </div>
 
                   <div className="flex items-center justify-between text-[11px] font-mono">
-                    <span className="text-slate-500 dark:text-slate-400">Status:</span>
-                    <span className={`font-semibold ${check.passed ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'}`}>
+                    <span className="text-muted dark:text-lavender/70">Status:</span>
+                    <span className={`font-semibold ${check.passed ? 'text-status-success' : 'text-status-danger'}`}>
                       {check.status}
                     </span>
                   </div>
 
-                  <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed font-sans pt-1">
+                  <p className="text-[11px] text-muted dark:text-mist/90 leading-relaxed font-sans pt-1">
                     {check.details}
                   </p>
                 </div>

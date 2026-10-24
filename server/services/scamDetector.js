@@ -73,7 +73,7 @@ export async function runComprehensiveAudit(extractedData, userProvidedDetails =
   const linkedin = analyzeLinkedInPresence(detectedCompanyName, linkedInUrl);
 
   // 4. Financial & Stock Markets (100% truthful, no fake charts)
-  const stocks = getCompanyFinancials(detectedCompanyName, ticker);
+  const stocks = await getCompanyFinancials(detectedCompanyName, ticker);
 
   // 5. Offer Letter Quality: Run ONLY if offer letter / email document is provided
   const offerLetterQuality = isOfferLetter ? evaluateOfferLetterQuality(rawText, flags) : null;

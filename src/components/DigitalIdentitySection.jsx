@@ -35,30 +35,30 @@ export function DigitalIdentitySection({ digitalIdentity = {}, defaultExpanded =
   const isDomainRisky = domainAge.includes('days old') || isTyposquatted || isFreeEmail || isDomainSanityWarning;
 
   return (
-    <div className="rounded-2xl bg-white dark:bg-[#091020] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+    <div className="vf-card overflow-hidden">
       {/* Collapsible Section Header */}
       <div 
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-900/40 transition-colors"
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 cursor-pointer hover:bg-violet/5 dark:hover:bg-violet/10 transition-colors"
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-indigo-600/20 border border-blue-200 dark:border-indigo-500/40 flex items-center justify-center text-blue-600 dark:text-indigo-400 shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-violet/15 dark:bg-violet/25 border border-violet/30 flex items-center justify-center text-violet dark:text-lavender shrink-0">
             <Globe2 className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <h2 className="text-base sm:text-lg font-bold text-vfslate dark:text-mist flex items-center gap-2">
               <span>Website & Email Domain Check</span>
               <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${
                 !hasDomain
-                  ? 'bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800'
+                  ? 'bg-slate-100 dark:bg-slate-800/80 text-muted dark:text-lavender/80 border-slate-200 dark:border-slate-700'
                   : isDomainRisky 
-                    ? 'bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800' 
-                    : 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
+                    ? 'bg-status-danger/10 text-status-danger border-status-danger/30 font-bold' 
+                    : 'bg-status-success/10 text-status-success border-status-success/30 font-bold'
               }`}>
                 {!hasDomain ? 'No Data / Not Checked' : isDomainRisky ? 'High Risk' : 'Authentic Domain'}
               </span>
             </h2>
-            <p className="text-xs text-slate-600 dark:text-slate-400">
+            <p className="text-xs text-muted dark:text-lavender/80">
               Official registration date, email sender consistency, and SSL encryption status
             </p>
           </div>
@@ -70,7 +70,7 @@ export function DigitalIdentitySection({ digitalIdentity = {}, defaultExpanded =
               href={`https://rdap.org/domain/${domain}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-cyan-400 hover:underline px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 transition-all min-h-[36px]"
+              className="vf-btn-secondary px-3 py-1.5 text-xs inline-flex items-center gap-1.5"
             >
               <span>Query RDAP ({domain})</span>
               <ExternalLink className="w-3.5 h-3.5" />
@@ -80,7 +80,7 @@ export function DigitalIdentitySection({ digitalIdentity = {}, defaultExpanded =
               href="https://www.whois.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-cyan-400 hover:underline px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 transition-all min-h-[36px]"
+              className="vf-btn-secondary px-3 py-1.5 text-xs inline-flex items-center gap-1.5"
             >
               <span>whois.com</span>
               <ExternalLink className="w-3.5 h-3.5" />
@@ -90,7 +90,7 @@ export function DigitalIdentitySection({ digitalIdentity = {}, defaultExpanded =
           <button
             type="button"
             onClick={() => setIsExpanded(!isExpanded)}
-            className="p-2 rounded-lg text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="p-2 rounded-lg text-muted hover:text-vfslate dark:text-lavender/70 dark:hover:text-mist hover:bg-slate-200/50 dark:hover:bg-slate-700/50 transition-colors"
             aria-label={isExpanded ? "Collapse section" : "Expand section"}
           >
             {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
@@ -99,8 +99,7 @@ export function DigitalIdentitySection({ digitalIdentity = {}, defaultExpanded =
       </div>
 
       {isExpanded && (
-        <div className="p-5 sm:p-6 border-t border-slate-200 dark:border-slate-800 space-y-6">
-
+        <div className="p-5 sm:p-6 border-t border-slate-200/60 dark:border-slate-700/60 space-y-6">
 
       {hasDomain ? (
         <div className="space-y-4">
@@ -108,19 +107,19 @@ export function DigitalIdentitySection({ digitalIdentity = {}, defaultExpanded =
             {/* Pillar 1: Domain Age */}
             <div className={`p-4 rounded-xl border ${
               domainAge.includes('days old') || isDomainSanityWarning 
-                ? 'bg-rose-50/60 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/60' 
-                : 'bg-slate-50 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800'
+                ? 'bg-status-danger/10 border-status-danger/30 text-vfslate dark:text-mist' 
+                : 'vf-inner-card'
             }`}>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">Domain Age</span>
-              <div className="text-base font-bold text-slate-900 dark:text-white font-mono mt-1">{domainAge}</div>
-              <p className="text-xs text-slate-600 dark:text-slate-400 mt-2">
-                Registrar: <strong className="text-slate-800 dark:text-slate-200">{whoisRegistrar}</strong>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted dark:text-lavender/80">Domain Age</span>
+              <div className="text-base font-bold text-vfslate dark:text-mist font-mono mt-1">{domainAge}</div>
+              <p className="text-xs text-muted dark:text-lavender/80 mt-2">
+                Registrar: <strong className="text-vfslate dark:text-mist">{whoisRegistrar}</strong>
               </p>
               {domainSanity && (
-                <div className={`mt-2.5 text-xs rounded-lg p-2 ${
+                <div className={`mt-2.5 text-xs rounded-lg p-2.5 ${
                   isDomainSanityWarning || domainAge.includes('days old')
-                    ? 'text-rose-700 dark:text-rose-300 font-bold bg-rose-100 dark:bg-rose-950/80 border border-rose-300 dark:border-rose-800'
-                    : 'text-emerald-700 dark:text-emerald-300 font-semibold bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800'
+                    ? 'text-status-danger font-bold bg-status-danger/15 border border-status-danger/30'
+                    : 'text-status-success font-semibold bg-status-success/10 border border-status-success/30'
                 }`}>
                   {domainSanity}
                 </div>
@@ -130,75 +129,75 @@ export function DigitalIdentitySection({ digitalIdentity = {}, defaultExpanded =
             {/* Pillar 2: Email Authenticity */}
             <div className={`p-4 rounded-xl border ${
               isFreeEmail 
-                ? 'bg-rose-50/60 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/60' 
-                : 'bg-slate-50 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800'
+                ? 'bg-status-danger/10 border-status-danger/30 text-vfslate dark:text-mist' 
+                : 'vf-inner-card'
             }`}>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">Sender Email Domain</span>
-              <div className="text-sm font-bold text-slate-900 dark:text-white font-mono mt-1 truncate" title={claimedEmail}>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted dark:text-lavender/80">Sender Email Domain</span>
+              <div className="text-sm font-bold text-vfslate dark:text-mist font-mono mt-1 truncate" title={claimedEmail}>
                 {claimedEmail}
               </div>
               <div className="mt-2 text-xs flex items-center gap-1.5">
                 {isFreeEmail ? (
-                  <span className="text-rose-600 dark:text-rose-400 font-bold flex items-center gap-1">
+                  <span className="text-status-danger font-bold flex items-center gap-1">
                     <XCircle className="w-4 h-4 shrink-0" />
                     <span>Free Public Email</span>
                   </span>
                 ) : (
-                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                  <span className="text-status-success font-semibold flex items-center gap-1">
                     <CheckCircle2 className="w-4 h-4 shrink-0" />
                     <span>Matches Corporate Domain</span>
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-2">
-                SPF: <strong className="text-slate-800 dark:text-slate-200">{spfStatus}</strong> • DMARC: <strong className="text-slate-800 dark:text-slate-200">{dmarcStatus}</strong>
+              <p className="text-[11px] text-muted dark:text-lavender/80 mt-2">
+                SPF: <strong className="text-vfslate dark:text-mist">{spfStatus}</strong> • DMARC: <strong className="text-vfslate dark:text-mist">{dmarcStatus}</strong>
               </p>
             </div>
 
             {/* Pillar 3: Typosquatting / Spoofing */}
             <div className={`p-4 rounded-xl border ${
               isTyposquatted 
-                ? 'bg-rose-50/60 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/60' 
-                : 'bg-slate-50 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800'
+                ? 'bg-status-danger/10 border-status-danger/30 text-vfslate dark:text-mist' 
+                : 'vf-inner-card'
             }`}>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">Lookalike / Spoof Check</span>
-              <div className="text-sm font-bold text-slate-900 dark:text-white font-mono mt-1">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted dark:text-lavender/80">Lookalike / Spoof Check</span>
+              <div className="text-sm font-bold text-vfslate dark:text-mist font-mono mt-1">
                 {isTyposquatted ? 'Lookalike Alert!' : 'Clean Domain'}
               </div>
-              <p className="text-xs text-slate-600 dark:text-slate-300 mt-2 leading-relaxed">
+              <p className="text-xs text-muted dark:text-mist/90 mt-2 leading-relaxed">
                 {spoofingCheck || 'No trademark mimicry or lookalike domain patterns detected.'}
               </p>
             </div>
 
             {/* Pillar 4: SSL & Website Security */}
-            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">Security Certificate (SSL)</span>
-              <div className="text-xs font-bold text-emerald-600 dark:text-emerald-400 font-mono mt-1 flex items-center gap-1">
+            <div className="vf-inner-card p-4">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted dark:text-lavender/80">Security Certificate (SSL)</span>
+              <div className="text-xs font-bold text-status-success font-mono mt-1 flex items-center gap-1">
                 <Lock className="w-3.5 h-3.5" />
                 <span>{sslStatus}</span>
               </div>
-              <p className="text-xs text-slate-600 dark:text-slate-300 mt-2 leading-relaxed">
+              <p className="text-xs text-muted dark:text-mist/90 mt-2 leading-relaxed">
                 {websiteSanity || 'SSL certificate verified and encrypted.'}
               </p>
             </div>
           </div>
 
           {source && (
-            <div className="text-[11px] font-mono text-slate-500 flex items-center justify-between px-1">
+            <div className="text-[11px] font-mono text-muted dark:text-lavender/70 flex items-center justify-between px-1">
               <span>Source: {source}</span>
               {checkedAt && <span>Checked: {new Date(checkedAt).toLocaleTimeString()}</span>}
             </div>
           )}
         </div>
       ) : (
-        <div className="p-6 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 text-center space-y-3">
-          <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-indigo-500/10 border border-blue-200 dark:border-indigo-500/20 text-blue-600 dark:text-indigo-400 flex items-center justify-center mx-auto">
+        <div className="vf-inner-card p-6 text-center space-y-3">
+          <div className="w-12 h-12 rounded-2xl bg-violet/15 dark:bg-violet/25 border border-violet/30 text-violet dark:text-lavender flex items-center justify-center mx-auto">
             <Globe2 className="w-6 h-6" />
           </div>
-          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+          <h3 className="text-sm font-semibold text-vfslate dark:text-mist">
             No Corporate Website or Email Domain Provided in Input
           </h3>
-          <p className="text-xs text-slate-600 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
+          <p className="text-xs text-muted dark:text-lavender/80 max-w-md mx-auto leading-relaxed">
             Live RDAP registration lookups, DNS SPF/DMARC checks, and SSL certificates are checked only when a corporate domain or official email address is detected in the input text.
           </p>
         </div>

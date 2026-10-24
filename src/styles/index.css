@@ -2,9 +2,53 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --sky: #A0D2EB;
+  --mist: #E5EAF5;
+  --lavender: #D0BDF4;
+  --violet: #8458B3;
+  --slate: #494D5F;
+  --muted: #5d6180;
+  
+  --status-high-risk: #C62828;
+  --status-warning: #B26A00;
+  --status-low-risk: #14803C;
+  --status-not-checked: #5d6180;
+  --status-unverified: #8458B3;
+}
+
 @layer base {
   body {
-    @apply bg-slate-50 text-slate-900 text-base font-sans antialiased selection:bg-blue-500/20 selection:text-blue-700 dark:bg-[#070b14] dark:text-slate-100 dark:selection:bg-cyan-500/30 dark:selection:text-cyan-200;
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    font-size: 16px;
+    line-height: 1.5;
+    color: #494D5F;
+    background: linear-gradient(135deg, #A0D2EB 0%, #D0BDF4 50%, #8458B3 100%);
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    background-size: cover;
+    position: relative;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Subtle noise/grain overlay at ~4% opacity */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.04;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  }
+
+  /* Dark theme background variant: gradient from #494D5F to #2f3242 with faint #8458B3 glow */
+  html.dark body {
+    background: radial-gradient(circle at 95% 95%, rgba(132, 88, 179, 0.28) 0%, transparent 45%), linear-gradient(135deg, #494D5F 0%, #2f3242 100%);
+    background-attachment: fixed;
+    color: #E5EAF5;
   }
 }
 
@@ -14,65 +58,132 @@
   height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: rgba(229, 234, 245, 0.6);
 }
 .dark ::-webkit-scrollbar-track {
-  background: #090f1d;
+  background: #2f3242;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #8458B3;
   border-radius: 4px;
 }
-.dark ::-webkit-scrollbar-thumb {
-  background: #1e293b;
-}
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-}
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: #334155;
+  background: #7346a0;
 }
 
-/* Print styles for Export Report */
+/* Print styles for Export Report: print as a white background with #494D5F text */
 @media print {
-  body {
-    background: white !important;
-    color: black !important;
+  body, html, body::before {
+    background: #FFFFFF !important;
+    background-image: none !important;
+    color: #494D5F !important;
+  }
+  .vf-card, .vf-inner-card, header, main, div, section {
+    background: #FFFFFF !important;
+    color: #494D5F !important;
+    box-shadow: none !important;
+    border-color: rgba(73, 77, 95, 0.2) !important;
   }
   .no-print {
     display: none !important;
   }
 }
 
-/* Cyber glow effects */
-.glow-cyan {
-  box-shadow: 0 0 25px -5px rgba(6, 182, 212, 0.25);
+/* Base surface card component:
+   solid #E5EAF5, with 16px radius, a 1px border of rgba(73,77,95,0.15) and a soft shadow.
+   Dark theme: #3a3e4f with a border of rgba(208,189,244,0.2).
+*/
+.vf-card {
+  background-color: #E5EAF5;
+  border-radius: 16px;
+  border: 1px solid rgba(73, 77, 95, 0.15);
+  box-shadow: 0 4px 20px -2px rgba(73, 77, 95, 0.08), 0 2px 6px -1px rgba(73, 77, 95, 0.04);
+}
+.dark .vf-card {
+  background-color: #3a3e4f;
+  border: 1px solid rgba(208, 189, 244, 0.2);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.25);
 }
 
-.glow-emerald {
-  box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.25);
+/* Inner sub-surface */
+.vf-inner-card {
+  background-color: rgba(255, 255, 255, 0.7);
+  border-radius: 12px;
+  border: 1px solid rgba(73, 77, 95, 0.12);
+}
+.dark .vf-inner-card {
+  background-color: #2f3242;
+  border: 1px solid rgba(208, 189, 244, 0.15);
 }
 
-.glow-rose {
-  box-shadow: 0 0 25px -5px rgba(244, 63, 94, 0.35);
+/* Primary Button: background #8458B3, white text, hover darkens about 8%, 2px focus ring in #A0D2EB */
+.vf-btn-primary {
+  background-color: #8458B3;
+  color: #FFFFFF !important;
+  font-weight: 600;
+  border-radius: 12px;
+  min-height: 44px;
+  padding: 0.625rem 1.25rem;
+  transition: all 0.15s ease-in-out;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.vf-btn-primary:hover {
+  background-color: #7346a0;
+}
+.vf-btn-primary:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #A0D2EB;
 }
 
-.glow-amber {
-  box-shadow: 0 0 25px -5px rgba(245, 158, 11, 0.25);
+/* Secondary Button: transparent with a 1.5px #8458B3 border and #8458B3 text on light cards */
+.vf-btn-secondary {
+  background-color: transparent;
+  color: #8458B3;
+  border: 1.5px solid #8458B3;
+  font-weight: 600;
+  border-radius: 12px;
+  min-height: 44px;
+  padding: 0.625rem 1.25rem;
+  transition: all 0.15s ease-in-out;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.vf-btn-secondary:hover {
+  background-color: rgba(132, 88, 179, 0.08);
+}
+.dark .vf-btn-secondary {
+  color: #D0BDF4;
+  border-color: #D0BDF4;
+}
+.dark .vf-btn-secondary:hover {
+  background-color: rgba(208, 189, 244, 0.12);
 }
 
-/* Grid background pattern */
-.bg-grid-pattern {
-  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
-  background-size: 24px 24px;
+/* Inputs: #E5EAF5 background, 1px #494D5F/30% border, focus ring #8458B3 */
+.vf-input {
+  background-color: #E5EAF5;
+  color: #494D5F;
+  border: 1px solid rgba(73, 77, 95, 0.3);
+  border-radius: 12px;
+  font-size: 16px;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-
-@keyframes laserScan {
-  0% { top: 0%; opacity: 0.7; }
-  50% { top: 95%; opacity: 1; }
-  100% { top: 0%; opacity: 0.7; }
+.vf-input:focus {
+  outline: none;
+  border-color: #8458B3;
+  box-shadow: 0 0 0 2px rgba(132, 88, 179, 0.35);
 }
-
-.animate-laser-scan {
-  animation: laserScan 2s ease-in-out infinite;
+.dark .vf-input {
+  background-color: #2f3242;
+  color: #E5EAF5;
+  border: 1px solid rgba(208, 189, 244, 0.3);
+}
+.dark .vf-input:focus {
+  border-color: #D0BDF4;
+  box-shadow: 0 0 0 2px rgba(208, 189, 244, 0.35);
 }
