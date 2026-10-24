@@ -1,0 +1,11 @@
+[
+  {
+    "id": "google_g_12345",
+    "name": "Test Student",
+    "email": "student.dev@gmail.com",
+    "picture": null,
+    "authProvider": "google",
+    "createdAt": "2026-10-21T11:42:51.173Z",
+    "isUnlimited": true
+  }
+]
