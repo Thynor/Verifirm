@@ -8,17 +8,32 @@ const FREE_EMAIL_PROVIDERS = [
   'protonmail.com', 'rediffmail.com', 'yandex.com'
 ];
 
-const REPUTABLE_CORPORATE_DOMAINS = [
-  { name: 'Tata Consultancy Services', officialDomain: 'tcs.com', aliases: ['tata.com'] },
-  { name: 'Infosys Limited', officialDomain: 'infosys.com' },
-  { name: 'Wipro Limited', officialDomain: 'wipro.com' },
-  { name: 'Google', officialDomain: 'google.com' },
-  { name: 'Microsoft', officialDomain: 'microsoft.com' },
-  { name: 'Amazon', officialDomain: 'amazon.com' },
-  { name: 'Cognizant', officialDomain: 'cognizant.com' },
-  { name: 'Accenture', officialDomain: 'accenture.com' },
-  { name: 'HCLTech', officialDomain: 'hcltech.com' }
-];
+export function extractBrandTokens(companyName) {
+  if (!companyName) return [];
+  const clean = companyName.toLowerCase().trim();
+  if (clean === 'unspecified' || clean === 'unspecified organisation') return [];
+
+  const stopWords = new Set([
+    'private', 'pvt', 'limited', 'ltd', 'llp', 'inc', 'corp', 'corporation',
+    'company', 'co', 'technologies', 'technology', 'tech', 'solutions',
+    'systems', 'services', 'enterprises', 'enterprise', 'group', 'global',
+    'international', 'labs', 'holdings', 'consulting', 'consultancy',
+    'india', 'usa', 'uk', 'network', 'digital', 'software', 'associates'
+  ]);
+
+  const rawWords = clean.split(/[^a-z0-9]+/).filter(Boolean);
+  const brandTokens = rawWords.filter(t => t.length >= 3 && !stopWords.has(t));
+  
+  // Include acronym if multi-word company name (e.g. "Tata Consultancy Services" -> "tcs")
+  if (rawWords.length >= 2) {
+    const acronym = rawWords.map(w => w[0]).join('');
+    if (acronym.length >= 2 && !brandTokens.includes(acronym)) {
+      brandTokens.push(acronym);
+    }
+  }
+
+  return brandTokens.length > 0 ? brandTokens : rawWords.filter(t => t.length >= 2);
+}
 
 export async function analyzeEmailAndDomain(email, domain, claimedCompany, flags = {}) {
   const cleanEmail = (email || '').trim().toLowerCase();
@@ -65,61 +80,41 @@ export async function analyzeEmailAndDomain(email, domain, claimedCompany, flags
     results.spoofingCheck = 'Not applicable (informal messaging channel)';
   }
 
-  // Check 2: Typosquatting / Lookalike Check (only applicable for corporate domains, never free email)
-  if (!results.isFreeEmail && targetDomain) {
-    const testString = `${targetDomain} ${emailDomain || ''}`.toLowerCase();
-    for (const corp of REPUTABLE_CORPORATE_DOMAINS) {
-      const brand = corp.officialDomain.split('.')[0];
-      if (testString.includes(brand) && !testString.endsWith(corp.officialDomain) && !corp.aliases?.some(a => testString.endsWith(a))) {
+  const brandTokens = claimedCompany ? extractBrandTokens(claimedCompany) : [];
+  const activeDomain = targetDomain || emailDomain;
+
+  // Check 2: Typosquatting / Lookalike Check (applicable for corporate domains, never free email)
+  if (!results.isFreeEmail && activeDomain && brandTokens.length > 0) {
+    const activeHost = activeDomain.split('.')[0];
+    const isHyphenatedOrKeyword = /(?:-|\b)(?:careers|jobs|recruitment|recruiting|hiring|hr|portal|verify|interview|onboarding|offer|team|online|support|auth|fake)(?:-|\b)/i.test(activeHost);
+    const hasBrandMatch = brandTokens.some(bt => activeHost.includes(bt));
+
+    if (hasBrandMatch && isHyphenatedOrKeyword) {
+      if (!cleanDomain || (cleanDomain !== activeDomain && !activeDomain.endsWith('.' + cleanDomain))) {
         results.isTyposquatted = true;
-        results.spoofedTarget = corp.name;
-        results.spoofingCheck = `CRITICAL ALERT: Detected lookalike domain (${targetDomain}) mimicking ${corp.name} (${corp.officialDomain}). Scammers frequently register hyphenated domains like '${brand}-careers.online' or '${brand}-hr.com' to deceive candidates.`;
-        break;
+        results.spoofedTarget = claimedCompany;
+        results.spoofingCheck = `CRITICAL ALERT: Detected lookalike domain (${activeDomain}) mimicking ${claimedCompany}. Scammers frequently register hyphenated domains like '${brandTokens[0]}-careers.online' or '${brandTokens[0]}-hr.com' to deceive candidates.`;
       }
     }
   }
 
   // Check 3: Claimed Corporate Brand vs Sender Domain Mismatch Check
-  if (claimedCompany && emailDomain) {
-    const normClaim = claimedCompany.toLowerCase();
-    for (const corp of REPUTABLE_CORPORATE_DOMAINS) {
-      const corpBrand = corp.officialDomain.split('.')[0];
-      if (normClaim.includes(corp.name.toLowerCase()) || normClaim.includes(corpBrand)) {
-        const matchesOfficial = emailDomain === corp.officialDomain || 
-                                emailDomain.endsWith('.' + corp.officialDomain) || 
-                                corp.aliases?.some(a => emailDomain === a || emailDomain.endsWith('.' + a));
-        if (!matchesOfficial) {
-          results.isDomainMismatch = true;
-          results.spoofedTarget = corp.name;
-          results.mismatchDetails = `CRITICAL DOMAIN SPOOFING ALERT: Communication claims to represent ${corp.name}, but sender email is @${emailDomain}. Legitimate ${corp.name} correspondence originates strictly from official @${corp.officialDomain} accounts.`;
-          results.spoofingCheck = results.mismatchDetails;
-          results.domainSanity = `CRITICAL FAILURE: Sender domain (@${emailDomain}) does NOT match claimed organization ${corp.name}. Suspected phishing or compromised webmail account.`;
-          break;
-        }
-      }
-    }
+  if (claimedCompany && emailDomain && !results.isFreeEmail && brandTokens.length > 0) {
+    const emailHost = emailDomain.split('.')[0];
+    const hasBrandMatch = brandTokens.some(bt => emailHost.includes(bt) || bt.includes(emailHost) || emailDomain.includes(bt));
 
-    // Generalized domain mismatch for any claimed company
-    if (!results.isDomainMismatch && !results.isFreeEmail && normClaim !== 'unspecified') {
-      if (cleanDomain && cleanDomain !== emailDomain && !emailDomain.endsWith('.' + cleanDomain) && !cleanDomain.endsWith('.' + emailDomain)) {
-        results.isDomainMismatch = true;
-        results.spoofedTarget = claimedCompany;
-        results.mismatchDetails = `CRITICAL DOMAIN MISMATCH: Communication claims to represent ${claimedCompany} (${cleanDomain}), but sender email originates from an unauthorized domain (@${emailDomain}).`;
-        results.spoofingCheck = results.mismatchDetails;
-        results.domainSanity = `CRITICAL FAILURE: Sender domain (@${emailDomain}) does not match organization domain (${cleanDomain}).`;
-      } else if (!cleanDomain) {
-        const stopWords = new Set(['technologies', 'technology', 'solutions', 'private', 'pvt', 'limited', 'ltd', 'llp', 'inc', 'corp', 'corporation', 'services', 'systems', 'enterprises', 'group', 'india', 'global', 'labs']);
-        const distinctiveTokens = normClaim.split(/[\s,.-]+/).filter(w => w.length >= 4 && !stopWords.has(w));
-        const domainTokens = emailDomain.split(/[\s,.-]+/);
-        const hasTokenMatch = distinctiveTokens.some(token => emailDomain.includes(token) || domainTokens.some(dt => dt.includes(token)));
-        if (distinctiveTokens.length > 0 && !hasTokenMatch) {
-          results.isDomainMismatch = true;
-          results.spoofedTarget = claimedCompany;
-          results.mismatchDetails = `CRITICAL SENDER MISMATCH: Communication claims to represent ${claimedCompany}, but sender email originates from an unrelated domain (@${emailDomain}).`;
-          results.spoofingCheck = results.mismatchDetails;
-          results.domainSanity = `CRITICAL WARNING: Sender domain (@${emailDomain}) has no evident affiliation with claimed employer ${claimedCompany}.`;
-        }
-      }
+    if (cleanDomain && cleanDomain !== emailDomain && !emailDomain.endsWith('.' + cleanDomain) && !cleanDomain.endsWith('.' + emailDomain)) {
+      results.isDomainMismatch = true;
+      results.spoofedTarget = claimedCompany;
+      results.mismatchDetails = `CRITICAL DOMAIN MISMATCH: Communication claims to represent ${claimedCompany} (${cleanDomain}), but sender email originates from an unauthorized domain (@${emailDomain}).`;
+      results.spoofingCheck = results.mismatchDetails;
+      results.domainSanity = `CRITICAL FAILURE: Sender domain (@${emailDomain}) does not match organization domain (${cleanDomain}).`;
+    } else if (!hasBrandMatch && !results.isTyposquatted) {
+      results.isDomainMismatch = true;
+      results.spoofedTarget = claimedCompany;
+      results.mismatchDetails = `CRITICAL SENDER MISMATCH: Communication claims to represent ${claimedCompany}, but sender email originates from an unrelated domain (@${emailDomain}).`;
+      results.spoofingCheck = results.mismatchDetails;
+      results.domainSanity = `CRITICAL WARNING: Sender domain (@${emailDomain}) has no evident affiliation with claimed employer ${claimedCompany}.`;
     }
   }
 

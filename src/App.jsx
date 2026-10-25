@@ -299,9 +299,10 @@ export default function App() {
     if (!analysisData) return;
     const summary = [
       `VeriFirm Job Verification Report: ${analysisData.companyName}`,
+      `Risk Level: ${analysisData.riskLevel || 'Low'}`,
       `Verdict: ${analysisData.verdict}`,
+      analysisData.trustScore !== null ? `Trust Score: ${analysisData.trustScore}/100 (${analysisData.scoreLabel || 'Provisional'})` : 'Trust Score: Not enough data',
       `Coverage: ${analysisData.coverageRatio || 'N/A'}`,
-      analysisData.trustScore !== null ? `Trust Score: ${analysisData.trustScore}/100` : 'Trust Score: Insufficient data (<5 checks performed)',
       '',
       'Top Reasons:',
       ...(analysisData.topReasons || []).map(r => `• [${r.severity}] ${r.rule}: ${r.description}`),
@@ -309,7 +310,7 @@ export default function App() {
       'Actionable Advice:',
       ...(analysisData.adviceList || []).map(a => `• ${a}`),
       '',
-      'Verified via VeriFirm (evidence-based scam intelligence)'
+      'Disclaimer: This score is a guide, not a probability or legal proof.'
     ].join('\n');
 
     navigator.clipboard.writeText(summary).then(() => {
@@ -321,6 +322,24 @@ export default function App() {
   // Build the list of unrun checks for the single collapsed section
   const getUnrunChecks = () => {
     if (!analysisData) return [];
+    if (analysisData.howCalculated?.checks) {
+      return analysisData.howCalculated.checks
+        .filter(c => !c.performed)
+        .map(c => ({
+          name: c.name,
+          reason: c.description || 'Not provided in communication or input text.',
+          tip: c.tip,
+          link: c.id === 'mca_gst' 
+            ? 'https://www.mca.gov.in/mcafoportal/viewCompanyMasterData.do'
+            : c.id === 'domain_age_dns_tls'
+              ? 'https://www.whois.com'
+              : c.id === 'address_offer_details'
+                ? 'https://maps.google.com'
+                : c.id === 'online_presence'
+                  ? 'https://www.linkedin.com'
+                  : null
+        }));
+    }
     const list = [];
     if (!analysisData.government?.cin) {
       list.push({

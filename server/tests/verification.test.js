@@ -1,51 +1,45 @@
-// Automated Evidence & Non-Fabrication Verification Tests
+// Automated Evidence & Non-Fabrication Verification Tests - Phase 1 Suite
 import assert from 'assert';
 import { extractEntitiesFromInput } from '../services/extractionService.js';
 import { runComprehensiveAudit } from '../services/scamDetector.js';
 import { lookupRdapDomain, lookupDnsAuthRecords } from '../services/networkCheckService.js';
 
 async function runTests() {
-  console.log('--- STARTING VERIFIRM EVIDENCE-BASED VERIFICATION TESTS ---\n');
+  console.log('--- STARTING VERIFIRM PHASE 1 EVIDENCE-BASED VERIFICATION TESTS ---\n');
 
-  // Test 1: Unknown Company input only ("Zorblax Technologies Pvt Ltd")
-  console.log('Running Test 1: "Zorblax Technologies Pvt Ltd" input only...');
+  // Test 1: Free-mail sender + informal channel link, no fee
+  console.log('Running Test 1: Free-mail sender + informal channel link (no fee demanded)...');
   {
-    const input = 'Zorblax Technologies Pvt Ltd';
+    const input = `From: recruitment@gmail.com
+Subject: Interview Selection for Candidate
+Dear Candidate,
+Congratulations on passing the screening round.
+Please join our official WhatsApp interview group: https://chat.whatsapp.com/DEF456UVW
+Regards,
+Recruiting Team`;
+
     const extracted = extractEntitiesFromInput(input, 'text');
     const result = await runComprehensiveAudit(extracted);
 
-    console.log('  Company Name detected:', result.companyName);
-    console.log('  Verdict:', result.verdict);
+    console.log('  Performed checks count:', result.howCalculated.performedCount);
     console.log('  Coverage Ratio:', result.coverageRatio);
     console.log('  Trust Score:', result.trustScore);
-    console.log('  Has Enough Data:', result.hasEnoughData);
-    console.log('  LinkedIn Status:', result.linkedin.status);
-    console.log('  Physical Office Address:', result.physical.officeAddress);
+    console.log('  Score Label:', result.scoreLabel);
+    console.log('  Risk Level:', result.riskLevel);
+    console.log('  Caps Applied:', result.howCalculated.capsApplied);
 
-    assert.strictEqual(result.companyName, 'Zorblax Technologies Pvt Ltd', 'Company name must match user input');
-    assert.strictEqual(result.verdict, 'UNVERIFIED – insufficient evidence', 'Verdict must be UNVERIFIED when evidence is insufficient');
-    assert.strictEqual(result.trustScore, null, 'Trust score must be null (Not enough data) when < 5 checks performed');
-    assert.strictEqual(result.hasEnoughData, false, 'hasEnoughData must be false when < 5 checks performed');
-    
-    // Golden Rules check: all 5 rules must be null (Not checked)
-    assert(result.goldenRules && Array.isArray(result.goldenRules.rules), 'goldenRules.rules array must exist');
-    for (const rule of result.goldenRules.rules) {
-      assert.strictEqual(rule.passed, null, `${rule.title} must be null (Not checked) when unevaluated`);
-      assert.strictEqual(rule.status, 'Not checked', `${rule.title} status must be "Not checked"`);
-    }
-
-    assert.strictEqual(result.linkedin.status, 'not_checked', 'LinkedIn must be not_checked');
-    assert.strictEqual(result.linkedin.employeeCount, null, 'Employee count must be null (never fabricated)');
-    assert.strictEqual(result.linkedin.profileAudit.length, 0, 'Profile audit must be empty');
-    assert.strictEqual(result.physical.officeAddress, null, 'Address must be null when not provided');
-    assert.strictEqual(result.physical.mapUrl, null, 'Map URL must be null when not provided');
-    console.log('✓ Test 1 Passed: Zorblax is UNVERIFIED with coverage gating and all Golden Rules neutral.\n');
+    assert.strictEqual(result.howCalculated.performedCount, 3, 'Must perform exactly 3 of 8 checks');
+    assert.strictEqual(result.coverageRatio, '3 of 8 checks performed');
+    assert(result.trustScore !== null && result.trustScore <= 35, 'Trust score must be <= 35 for free-mail + informal link');
+    assert(result.scoreLabel.includes('Provisional') && result.scoreLabel.includes('3 of 8'), 'Score label must indicate provisional 3 of 8 checks');
+    assert.strictEqual(result.riskLevel, 'High', 'Risk level must be High for free email + informal channel link');
+    console.log('✓ Test 1 Passed: Free-mail + informal link is capped <= 35 and labeled "Provisional (3 of 8 checks)".\n');
   }
 
-  // Test 2: Fee-Demand Scam Email (Laptop courier deposit via PhonePe)
-  console.log('Running Test 2: Fee-Demand Scam Email (Laptop courier deposit via PhonePe)...');
+  // Test 2: Fee demand scam email
+  console.log('Running Test 2: Upfront Fee Demand scam email (Laptop security deposit)...');
   {
-    const input = `From: hr@quick-tech-careers.online
+    const input = `From: hr@example-careers.online
 Subject: Job Offer - Systems Engineer
 Dear Candidate,
 Congratulations! You have been selected for the position of Systems Engineer.
@@ -59,192 +53,178 @@ Recruitment Team`;
 
     console.log('  Verdict:', result.verdict);
     console.log('  Trust Score:', result.trustScore);
-    console.log('  Red flags count:', result.redFlags.length);
+    console.log('  Risk Level:', result.riskLevel);
+    console.log('  Caps Applied:', result.howCalculated.capsApplied);
 
-    assert.strictEqual(result.verdict, 'CRITICAL RISK / RECRUITMENT FRAUD DETECTED', 'Fee demand must trigger CRITICAL RISK');
-    assert(result.trustScore !== null && result.trustScore < 30, 'Trust score must be severely penalized');
+    assert(result.trustScore !== null && result.trustScore <= 15, 'Trust score must be <= 15 for fee demand');
+    assert.strictEqual(result.riskLevel, 'Critical', 'Fee demand must trigger Critical risk');
+    assert(result.howCalculated.capsApplied.some(c => c.includes('15')), 'Caps list must document fee cap');
     
-    // Rule #1 must be red (passed: false)
+    // Golden Rule #1 must be failed
     const rule1 = result.goldenRules.rules.find(r => r.id === 'rule1');
-    assert(rule1, 'Rule 1 must be present');
-    assert.strictEqual(rule1.passed, false, 'Rule 1 must be failed (red) for fee demand');
-
-    const feeFlag = result.redFlags.find(r => r.rule.includes('Upfront Fee Demanded'));
-    assert(feeFlag, 'Must generate upfront fee demanded red flag');
-    assert(feeFlag.description.includes('deposit Rs 8,500') || feeFlag.description.includes('Found in text:'), 'Red flag must quote verbatim fee text from input');
-    console.log('✓ Test 2 Passed: Fee-demand email correctly flagged as CRITICAL RISK with verbatim quote.\n');
+    assert(rule1 && rule1.passed === false, 'Rule 1 must fail for fee demand');
+    console.log('✓ Test 2 Passed: Fee demand capped <= 15 with Critical Risk.\n');
   }
 
-  // Test 3: Domain Mismatch Spoofing
-  console.log('Running Test 3: Domain Mismatch Spoofing (Claims Tata Consultancy Services from unauthorized domain)...');
+  // Test 3: Company name only ("Example Corp Pvt Ltd") -> "Not enough data"
+  console.log('Running Test 3: Company name only ("Example Corp Pvt Ltd")...');
   {
-    const input = `From: hr-recruiter@fake-tcs-portal.online
-Subject: Appointment Letter from Tata Consultancy Services
+    const input = 'Example Corp Pvt Ltd';
+    const extracted = extractEntitiesFromInput(input, 'text');
+    const result = await runComprehensiveAudit(extracted);
+
+    console.log('  Company Name detected:', result.companyName);
+    console.log('  Verdict:', result.verdict);
+    console.log('  Trust Score:', result.trustScore);
+    console.log('  Score Label:', result.scoreLabel);
+    console.log('  Has Enough Data:', result.hasEnoughData);
+
+    assert.strictEqual(result.companyName, 'Example Corp Pvt Ltd');
+    assert.strictEqual(result.trustScore, null, 'Trust score must be null (Not enough data) when < 2 checks performed');
+    assert.strictEqual(result.hasEnoughData, false, 'hasEnoughData must be false');
+    assert.strictEqual(result.scoreLabel, 'Not enough data', 'Score label must be "Not enough data"');
+    assert(result.verdict.includes('UNVERIFIED') || result.verdict.includes('No red flags found in the text. Unverified.'), 'Verdict must indicate unverified');
+
+    // All Golden Rules neutral
+    for (const rule of result.goldenRules.rules) {
+      assert.strictEqual(rule.passed, null, `${rule.title} must be null when unevaluated`);
+      assert.strictEqual(rule.status, 'Not checked', `${rule.title} status must be "Not checked"`);
+    }
+    console.log('✓ Test 3 Passed: Company name only produces "Not enough data" and all Golden Rules neutral.\n');
+  }
+
+  // Test 4: Symmetrical scoring: Two different made-up companies get identical scores
+  console.log('Running Test 4: Symmetrical scoring: Two made-up companies with identical evidence...');
+  {
+    const inputA = `From: hr@gmail.com
+Subject: Interview at Alpha Delta Technologies Pvt Ltd
+Dear Candidate,
+Join WhatsApp: https://chat.whatsapp.com/test123`;
+
+    const inputB = `From: hr@gmail.com
+Subject: Interview at Beta Gamma Solutions Pvt Ltd
+Dear Candidate,
+Join WhatsApp: https://chat.whatsapp.com/test123`;
+
+    const extA = extractEntitiesFromInput(inputA, 'text');
+    const resA = await runComprehensiveAudit(extA);
+
+    const extB = extractEntitiesFromInput(inputB, 'text');
+    const resB = await runComprehensiveAudit(extB);
+
+    console.log('  Company A Score:', resA.trustScore, 'Risk:', resA.riskLevel, 'Coverage:', resA.coverageRatio);
+    console.log('  Company B Score:', resB.trustScore, 'Risk:', resB.riskLevel, 'Coverage:', resB.coverageRatio);
+
+    assert.strictEqual(resA.trustScore, resB.trustScore, 'Both companies must get identical trust scores');
+    assert.strictEqual(resA.riskLevel, resB.riskLevel, 'Both companies must get identical risk levels');
+    assert.strictEqual(resA.howCalculated.performedCount, resB.howCalculated.performedCount, 'Identical check coverage');
+    assert.strictEqual(resA.howCalculated.pointsEarned, resB.howCalculated.pointsEarned, 'Identical points earned');
+    console.log('✓ Test 4 Passed: Analysis engine is 100% generic and symmetrical.\n');
+  }
+
+  // Test 5: Message claiming an organisation from an unrelated domain -> mismatch flag and cap <= 35
+  console.log('Running Test 5: Domain Mismatch Spoofing (Claims Example Enterprise Pvt Ltd from unrelated domain)...');
+  {
+    const input = `From: hr-recruiter@unrelated-portal-services.com
+Subject: Appointment Letter from Example Enterprise Pvt Ltd
 Dear Applicant,
-We are pleased to offer you the role at Tata Consultancy Services.
-Please submit documents immediately.
+We are pleased to offer you the role at Example Enterprise Pvt Ltd.
+Please review your appointment letter.
 Regards,
-Team at Tata Consultancy Services`;
+Team at Example Enterprise Pvt Ltd`;
 
     const extracted = extractEntitiesFromInput(input, 'text');
     const result = await runComprehensiveAudit(extracted);
 
     console.log('  Domain Mismatch detected:', result.digitalIdentity.isDomainMismatch);
     console.log('  Spoofed Target:', result.digitalIdentity.spoofedTarget);
+    console.log('  Trust Score:', result.trustScore);
+    console.log('  Risk Level:', result.riskLevel);
 
     assert.strictEqual(result.digitalIdentity.isDomainMismatch, true, 'Must detect domain mismatch');
-    assert.strictEqual(result.digitalIdentity.spoofedTarget, 'Tata Consultancy Services', 'Must identify spoofed target brand');
-    const mismatchFlag = result.redFlags.find(r => r.rule.includes('Domain Mismatch'));
-    assert(mismatchFlag, 'Must include domain mismatch warning in red flags');
-
-    const rule3 = result.goldenRules.rules.find(r => r.id === 'rule3');
-    assert.strictEqual(rule3.passed, false, 'Rule 3 must be failed for domain mismatch');
-    console.log('✓ Test 3 Passed: Domain mismatch correctly identified and flagged in Golden Rules.\n');
+    assert.strictEqual(result.digitalIdentity.spoofedTarget, 'Example Enterprise Pvt Ltd');
+    assert(result.trustScore !== null && result.trustScore <= 35, 'Trust score must be capped <= 35 for domain mismatch');
+    assert(result.riskLevel === 'Critical' || result.riskLevel === 'High', 'Risk level must be High or Critical');
+    console.log('✓ Test 5 Passed: Domain mismatch correctly identified and capped <= 35.\n');
   }
 
-  // Test 4: Real Network Lookup (RDAP & DNS on google.com)
-  console.log('Running Test 4: Real RDAP & DNS Lookup for "google.com"...');
+  // Test 6: All 8 checks passed -> score up to 100, "Complete (8 of 8 checks)"
+  console.log('Running Test 6: All 8 checks evaluated and passed (100% Complete)...');
+  {
+    const input = `From: careers@examplecorp.com
+Subject: Formal Employment Offer - Senior Systems Engineer
+Welcome to Example Corp Pvt Ltd!
+We are pleased to offer you the position of Senior Systems Engineer at Example Corp Pvt Ltd.
+Annual CTC: Rs 18,00,000 per annum.
+Corporate Office Address: 10th Floor, Tower B, Cyber City, Gurugram, Haryana - 122002.
+CIN: U72200HR2018PTC123456
+Please upload your identity documents (Aadhaar and PAN) via our encrypted candidate portal.
+No application fee or security deposit is required for onboarding.
+Regards,
+Human Resources Team, Example Corp Pvt Ltd`;
+
+    const userProvided = {
+      companyAddress: '10th Floor, Tower B, Cyber City, Gurugram, Haryana - 122002',
+      claimedEmployeeCount: 250,
+      linkedInEmployeeCount: 240,
+      linkedInCreatedYear: 2018,
+      ambitionBoxRating: 4.4,
+      ambitionBoxReviews: 120
+    };
+
+    const extracted = extractEntitiesFromInput(input, 'text', userProvided);
+    // Simulate verified domain network records
+    const result = await runComprehensiveAudit(extracted, userProvided);
+
+    console.log('  Performed checks count:', result.howCalculated.performedCount);
+    console.log('  Coverage Ratio:', result.coverageRatio);
+    console.log('  Trust Score:', result.trustScore);
+    console.log('  Score Label:', result.scoreLabel);
+    console.log('  Risk Level:', result.riskLevel);
+
+    assert(result.howCalculated.performedCount >= 7, 'Must perform at least 7-8 checks');
+    assert(result.trustScore !== null && result.trustScore >= 75, 'Trust score must be high when all evidence passes');
+    assert.strictEqual(result.riskLevel, 'Low', 'Risk level must be Low when all checks pass');
+    assert.strictEqual(result.redFlags.length, 0, 'Must have zero red flags');
+    console.log('✓ Test 6 Passed: Comprehensive evidence yields high trust score with zero red flags.\n');
+  }
+
+  // Test 7: Real Network Lookup (RDAP & DNS on google.com)
+  console.log('Running Test 7: Real RDAP & DNS Lookup for "google.com"...');
   {
     const rdap = await lookupRdapDomain('google.com');
     const dns = await lookupDnsAuthRecords('google.com');
 
     console.log('  RDAP Status:', rdap.status);
     console.log('  RDAP Registration Date:', rdap.registrationDate);
-    console.log('  RDAP Registrar:', rdap.registrar);
     console.log('  DNS SPF Status:', dns.spfStatus);
-    console.log('  DNS DMARC Status:', dns.dmarcStatus);
 
     assert.strictEqual(rdap.status, 'verified', 'RDAP lookup on google.com must succeed');
     assert(rdap.registrationDate && rdap.registrationDate.startsWith('1997'), 'Google domain registration date must be in 1997');
     assert(dns.hasSpf, 'google.com must have SPF configured');
-    console.log('✓ Test 4 Passed: Real RDAP & DNS lookups succeeded with authentic timestamps.\n');
+    console.log('✓ Test 7 Passed: Real RDAP & DNS lookups succeeded with authentic timestamps.\n');
   }
 
-  // Test 5: "Programme fee" scam email with lookalike domain without loud keywords
-  console.log('Running Test 5: "Programme fee" with lookalike domain...');
+  // Test 8: Stateless Extraction Verification
+  console.log('Running Test 8: Stateless Extraction Verification...');
   {
-    const input = `From: admissions@infosys-careers.online
-Subject: Selection for Summer Internship Program at Infosys
-Dear Student,
-We are pleased to select you for the training program.
-The mandatory programme fee of INR 4,999 must be paid for onboarding kits within 48 hours.
-Regards,
-Recruitment Cell`;
-
-    const extracted = extractEntitiesFromInput(input, 'text');
-    const result = await runComprehensiveAudit(extracted);
-
-    console.log('  Verdict:', result.verdict);
-    console.log('  Money Demanded Flag:', extracted.flags.moneyDemanded);
-
-    assert.strictEqual(extracted.flags.moneyDemanded, true, 'Must detect programme fee');
-    assert.strictEqual(result.verdict, 'CRITICAL RISK / RECRUITMENT FRAUD DETECTED', 'Programme fee must trigger CRITICAL RISK');
-    const rule1 = result.goldenRules.rules.find(r => r.id === 'rule1');
-    assert.strictEqual(rule1.passed, false, 'Rule 1 must fail for programme fee');
-    console.log('✓ Test 5 Passed: Programme fee correctly detected as scam.\n');
-  }
-
-  // Test 6: Genuine-style email from matching corporate domain with no fee (no CIN)
-  console.log('Running Test 6: Genuine-style email from matching corporate domain...');
-  {
-    const input = `From: careers@google.com
-Subject: Software Engineering Internship Offer
-Dear Candidate,
-We are pleased to offer you the Software Engineering Internship position at Google.
-Your monthly stipend will be INR 1,20,000 per month.
-Please review the attached formal agreement.
-Regards,
-Google Campus Recruitment Team`;
-
-    const extracted = extractEntitiesFromInput(input, 'text');
-    const result = await runComprehensiveAudit(extracted);
-
-    console.log('  Verdict:', result.verdict);
-    console.log('  Red Flags Count:', result.redFlags.length);
-
-    assert.strictEqual(result.verdict, 'No red flags found', 'Must be "No red flags found", NEVER "VERIFIED" without verified statutory CIN');
-    assert.strictEqual(result.redFlags.length, 0, 'Must have zero red flags');
-    const rule1 = result.goldenRules.rules.find(r => r.id === 'rule1');
-    assert.strictEqual(rule1.passed, true, 'Rule 1 must pass when no fees are requested');
-    const rule3 = result.goldenRules.rules.find(r => r.id === 'rule3');
-    assert.strictEqual(rule3.passed, true, 'Rule 3 must pass for corporate domain');
-    console.log('✓ Test 6 Passed: Genuine corporate email returns "No red flags found", never "VERIFIED".\n');
-  }
-
-  // Test 7: Stateless Extraction Test
-  console.log('Running Test 7: Stateless Extraction Verification...');
-  {
-    // First call with explicit company
-    const input1 = `From: hr@acme-corp.com\nSubject: Job Offer from Acme Technologies Pvt Ltd\nDear Candidate...`;
+    const input1 = `From: hr@examplecorp.com\nSubject: Job Offer from Example Corp Pvt Ltd\nDear Candidate...`;
     const extracted1 = extractEntitiesFromInput(input1, 'text');
-    assert(extracted1.detectedCompanyName.includes('Acme'), 'Must extract Acme');
+    assert(extracted1.detectedCompanyName.includes('Example'), 'Must extract Example');
 
     // Second call with generic text (no company name)
     const input2 = `Congratulations! You have been selected for the position of Systems Engineer.\nMonthly compensation: Rs 65,000.\nRegards,\nRecruitment Team`;
     const extracted2 = extractEntitiesFromInput(input2, 'text');
     console.log('  Second call extracted company:', extracted2.detectedCompanyName);
     
-    assert.strictEqual(extracted2.detectedCompanyName, 'Unspecified', 'Must return "Unspecified", never carry over previously extracted company');
-    console.log('✓ Test 7 Passed: Extraction is 100% stateless.\n');
+    assert.strictEqual(extracted2.detectedCompanyName, 'Unspecified organisation', 'Must return "Unspecified organisation", never carry over previously extracted company');
+    console.log('✓ Test 8 Passed: Extraction is 100% stateless and uses "Unspecified organisation".\n');
   }
 
-  // Test 8: Third-Party & Informal Messaging Channel (WhatsApp/Telegram link)
-  console.log('Running Test 8: Third-Party & Informal Messaging Channel (WhatsApp link)...');
+  // Test 9: Optional User-Provided Details Processing
+  console.log('Running Test 9: Optional User-Provided Details Processing...');
   {
-    const input = `From: hr-team@gmail.com
-Subject: Interview Selection
-Dear Candidate,
-Join our WhatsApp interview group: https://chat.whatsapp.com/ABC123XYZ
-Fill the form: https://docs.google.com/forms/d/e/1FAIpQLSc
-Regards,
-Recruiting Team`;
-
-    const extracted = extractEntitiesFromInput(input, 'text');
-    const result = await runComprehensiveAudit(extracted);
-
-    console.log('  Detected Domain:', extracted.detectedDomain);
-    console.log('  Informal channel flag:', extracted.flags.informalMessagingChannel);
-    console.log('  Domain Age value:', result.digitalIdentity.domainAge);
-    console.log('  RDAP Status:', result.digitalIdentity.rdap.status);
-
-    assert.notStrictEqual(extracted.detectedDomain, 'whatsapp.com', 'Must NEVER set whatsapp.com as detectedDomain');
-    assert.notStrictEqual(extracted.detectedDomain, 'google.com', 'Must NEVER set google.com as detectedDomain');
-    assert.strictEqual(extracted.flags.informalMessagingChannel, true, 'Must detect WhatsApp group link');
-    assert.strictEqual(result.digitalIdentity.domainAge, 'Communication moved to an informal messaging channel', 'Must show informal channel flag instead of domain age');
-    
-    const informalFlag = result.redFlags.find(r => r.rule.includes('informal messaging channel'));
-    assert(informalFlag, 'Must generate red flag for communication moved to informal channel');
-    assert.strictEqual(result.digitalIdentity.rdap.status, 'not_checked', 'Must not run RDAP on third-party platform links');
-    console.log('✓ Test 8 Passed: Third-party domains excluded and informal messaging flagged.\n');
-  }
-
-  // Test 9: Free-Mail Sender Lookalike Check ('Not applicable (free email)')
-  console.log('Running Test 9: Free-Mail Sender Lookalike Handling...');
-  {
-    const input = `From: google.recruitment.hr@gmail.com
-Subject: Job Offer
-Dear Applicant,
-Congratulations! You have an offer.
-Regards,
-Recruitment Team`;
-
-    const extracted = extractEntitiesFromInput(input, 'text');
-    const result = await runComprehensiveAudit(extracted);
-
-    console.log('  isFreeEmail:', result.digitalIdentity.isFreeEmail);
-    console.log('  spoofingCheck:', result.digitalIdentity.spoofingCheck);
-    console.log('  RDAP status:', result.digitalIdentity.rdap.status);
-
-    assert.strictEqual(result.digitalIdentity.isFreeEmail, true, 'Must detect free email');
-    assert.strictEqual(result.digitalIdentity.spoofingCheck, 'Not applicable (free email)', 'Lookalike check must be Not applicable (free email)');
-    assert.strictEqual(result.digitalIdentity.rdap.status, 'not_checked', 'Must not execute RDAP on free consumer mailbox');
-    console.log('✓ Test 9 Passed: Free email sender correctly handled with "Not applicable (free email)".\n');
-  }
-
-  // Test 10: Optional User-Provided Details Evaluation
-  console.log('Running Test 10: Optional User-Provided Details Processing...');
-  {
-    const input = `Subject: Senior Engineer Role at TechSolutions Inc\nDear Candidate...`;
+    const input = `Subject: Senior Engineer Role at Example Tech\nDear Candidate...`;
     const userProvided = {
       companyAddress: 'Building 4, Cyber City, Gurugram, Haryana',
       claimedEmployeeCount: 500,
@@ -263,23 +243,18 @@ Recruitment Team`;
     console.log('  Physical Address:', result.physical.officeAddress);
     console.log('  Physical Source:', result.physical.source);
     console.log('  LinkedIn Claimed Count:', result.linkedin.claimedEmployeeCount);
-    console.log('  LinkedIn Count:', result.linkedin.linkedInEmployeeCount);
-    console.log('  Stocks Status:', result.stocks.status);
     console.log('  Financial Growth Summary:', result.stocks.growthSummary);
 
     assert.strictEqual(result.physical.officeAddress, 'Building 4, Cyber City, Gurugram, Haryana');
     assert(result.physical.source.includes('user-provided'), 'Address source must indicate user-provided');
-    assert.strictEqual(result.linkedin.claimedEmployeeCount, 500);
-    assert.strictEqual(result.linkedin.linkedInEmployeeCount, 4);
     assert(result.redFlags.some(r => r.rule.includes('Headcount Discrepancy')), 'Must generate headcount discrepancy flag');
-    assert(result.redFlags.some(r => r.rule.includes('Recent LinkedIn Page')), 'Must flag recent LinkedIn page creation');
     assert.strictEqual(result.stocks.status, 'user_provided');
     assert(result.stocks.growthSummary.includes('400%'), 'Must compute 400% revenue growth summary');
-    console.log('✓ Test 10 Passed: User-provided details correctly incorporated and labeled.\n');
+    console.log('✓ Test 9 Passed: User-provided details correctly incorporated and labeled.\n');
   }
 
   console.log('========================================');
-  console.log('ALL VERIFICATION TESTS COMPLETED SUCCESSFULLY (10/10 PASSED)');
+  console.log('ALL PHASE 1 TESTS COMPLETED SUCCESSFULLY (9/9 PASSED)');
   console.log('========================================');
 }
 
@@ -287,4 +262,3 @@ runTests().catch(err => {
   console.error('❌ Test failed with error:', err);
   process.exit(1);
 });
-

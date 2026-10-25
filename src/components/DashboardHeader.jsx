@@ -9,33 +9,36 @@ import { translations } from '../utils/translations.js';
 export function DashboardHeader({ data, onReset, lang = 'en' }) {
   const t = translations[lang] || translations.en;
   const [copied, setCopied] = useState(false);
+  const [showCalculation, setShowCalculation] = useState(false);
 
   const score = data.trustScore;
-  const hasEnoughData = data.hasEnoughData !== false && score !== null && score !== undefined;
-  const isHighRisk = data.verdict?.includes('CRITICAL RISK') || (hasEnoughData && score < 40);
+  const hasScore = score !== null && score !== undefined;
+  const isCritical = data.riskLevel === 'Critical' || data.verdict?.includes('CRITICAL RISK');
+  const isHigh = data.riskLevel === 'High' || data.verdict?.includes('High Risk');
+  const isMedium = data.riskLevel === 'Medium' || data.verdict?.includes('Medium Risk');
   const isVerified = data.verdict === 'VERIFIED';
   const isNoRedFlags = data.verdict?.includes('No red flags found');
-  const isInsufficient = !hasEnoughData || data.verdict?.includes('UNVERIFIED');
 
-  // Colors paired with icons & text
-  const strokeColor = isHighRisk ? '#C62828' : (isVerified || isNoRedFlags) ? '#14803C' : isInsufficient ? '#8458B3' : '#B26A00';
-  const badgeBg = isHighRisk 
-    ? 'bg-[#C62828]/15 border-[#C62828]/40 text-[#C62828]' 
-    : (isVerified || isNoRedFlags)
-      ? 'bg-[#14803C]/15 border-[#14803C]/40 text-[#14803C]' 
-      : isInsufficient
-        ? 'bg-[#8458B3]/15 border-[#8458B3] text-[#8458B3] dark:text-[#D0BDF4]'
-        : 'bg-[#B26A00]/15 border-[#B26A00]/40 text-[#B26A00]';
+  // Stroke color for dials
+  const strokeColor = isCritical || isHigh ? '#C62828' : isMedium ? '#B26A00' : isVerified || isNoRedFlags ? '#14803C' : '#8458B3';
+  const badgeBg = isCritical || isHigh
+    ? 'bg-[#C62828]/15 border-[#C62828]/40 text-[#C62828]'
+    : isMedium
+      ? 'bg-[#B26A00]/15 border-[#B26A00]/40 text-[#B26A00]'
+      : isVerified || isNoRedFlags
+        ? 'bg-[#14803C]/15 border-[#14803C]/40 text-[#14803C]'
+        : 'bg-[#8458B3]/15 border-[#8458B3] text-[#8458B3] dark:text-[#D0BDF4]';
 
   const circumference = 2 * Math.PI * 42;
-  const strokeDashoffset = hasEnoughData ? (circumference - (score / 100) * circumference) : circumference;
+  const strokeDashoffset = hasScore ? (circumference - (score / 100) * circumference) : circumference;
 
   const handleCopyReport = () => {
     const summary = [
       `VeriFirm Job Verification Report: ${data.companyName}`,
+      `Risk Level: ${data.riskLevel || 'Low'}`,
       `Verdict: ${data.verdict}`,
+      hasScore ? `Trust Score: ${score}/100 (${data.scoreLabel || 'Provisional'})` : 'Trust Score: Not enough data',
       `Coverage: ${data.coverageRatio || 'N/A'}`,
-      score !== null ? `Trust Score: ${score}/100` : 'Trust Score: Insufficient data (<5 checks performed)',
       '',
       'Top Reasons:',
       ...(data.topReasons || []).map(r => `• [${r.severity}] ${r.rule}: ${r.description}`),
@@ -43,7 +46,7 @@ export function DashboardHeader({ data, onReset, lang = 'en' }) {
       'Actionable Advice:',
       ...(data.adviceList || []).map(a => `• ${a}`),
       '',
-      'Verified via VeriFirm (evidence-based scam intelligence)'
+      'Disclaimer: This score is a guide, not a probability or legal proof.'
     ].join('\n');
 
     navigator.clipboard.writeText(summary).then(() => {
@@ -121,14 +124,18 @@ export function DashboardHeader({ data, onReset, lang = 'en' }) {
           <div className="space-y-3 flex-1">
             <div className="flex flex-wrap items-center gap-3">
               <span className={`text-xs px-3 py-1.5 rounded-full border font-bold flex items-center gap-2 ${badgeBg}`}>
-                {isHighRisk ? (
+                {isCritical || isHigh ? (
                   <AlertOctagon className="w-4 h-4 text-[#C62828] shrink-0" />
+                ) : isMedium ? (
+                  <AlertTriangle className="w-4 h-4 text-[#B26A00] shrink-0" />
                 ) : isVerified || isNoRedFlags ? (
                   <CheckCircle2 className="w-4 h-4 text-[#14803C] shrink-0" />
                 ) : (
                   <HelpCircle className="w-4 h-4 text-[#8458B3] dark:text-[#D0BDF4] shrink-0" />
                 )}
-                <span>{data.verdict || 'UNVERIFIED – insufficient evidence'}</span>
+                <span>
+                  {data.riskLevel === 'Critical' ? 'Critical Risk' : data.riskLevel === 'High' ? 'High Risk' : data.riskLevel === 'Medium' ? 'Medium Risk' : (data.verdict || 'UNVERIFIED – insufficient evidence')}
+                </span>
               </span>
 
               {data.coverageRatio && (
@@ -171,9 +178,9 @@ export function DashboardHeader({ data, onReset, lang = 'en' }) {
             )}
           </div>
 
-          {/* Trust Score Gauge (Only when >= 5 checks performed) */}
-          <div className="flex flex-col items-center justify-center p-4 rounded-xl vf-inner-card min-w-[200px] w-full sm:w-auto">
-            {hasEnoughData ? (
+          {/* Trust Score Gauge */}
+          <div className="flex flex-col items-center justify-center p-4 rounded-xl vf-inner-card min-w-[210px] w-full sm:w-auto">
+            {hasScore ? (
               <div className="relative w-28 h-28 flex items-center justify-center">
                 <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
                   <circle
@@ -200,24 +207,129 @@ export function DashboardHeader({ data, onReset, lang = 'en' }) {
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center p-2 text-center">
                   <span className="text-2xl font-black text-[#494D5F] dark:text-white font-mono">{score}</span>
-                  <span className="text-[10px] uppercase font-semibold text-[#5d6180] dark:text-[#E5EAF5]/70">Trust Score</span>
+                  <span className="text-[10px] uppercase font-semibold text-[#5d6180] dark:text-[#E5EAF5]/70">Provisional Score</span>
                 </div>
               </div>
             ) : (
               <div className="p-3 text-center space-y-1">
                 <HelpCircle className="w-8 h-8 text-[#8458B3] dark:text-[#D0BDF4] mx-auto" />
                 <p className="text-xs font-semibold text-[#494D5F] dark:text-[#E5EAF5]">
-                  {t.scoreNotEnough}
+                  {t.scoreNotEnough || 'Not enough data'}
                 </p>
                 <p className="text-[11px] text-[#5d6180] dark:text-[#E5EAF5]/70">
-                  (Requires at least 5 of 8 checks to compute an overall numeric score)
+                  (Requires at least 2 checks to compute a provisional score)
                 </p>
               </div>
             )}
             <span className="text-xs font-semibold mt-2 text-[#494D5F] dark:text-[#E5EAF5] text-center">
-              {isHighRisk ? 'High Risk Warning' : isVerified ? 'Verified Evidence' : isNoRedFlags ? 'No Red Flags' : 'Insufficient Evidence'}
+              {data.scoreLabel || (hasScore ? 'Provisional Score' : 'Not enough data')}
+            </span>
+            <span className="text-[11px] font-mono text-[#5d6180] dark:text-[#E5EAF5]/70 text-center mt-0.5">
+              Risk Level: <strong className="text-[#494D5F] dark:text-white">{data.riskLevel || 'Low'}</strong>
             </span>
           </div>
+        </div>
+
+        {/* How This Score Was Calculated Accordion */}
+        <div className="pt-2 border-t border-[#494D5F]/15 dark:border-[#D0BDF4]/20">
+          <button
+            type="button"
+            onClick={() => setShowCalculation(!showCalculation)}
+            className="w-full flex items-center justify-between p-3.5 rounded-xl vf-inner-card text-xs font-semibold text-[#494D5F] dark:text-[#E5EAF5] hover:bg-[#D0BDF4]/20 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Info className="w-4 h-4 text-[#8458B3] dark:text-[#D0BDF4]" />
+              <span>How this score was calculated ({data.howCalculated?.performedCount || 0} of 8 checks evaluated)</span>
+            </div>
+            <span className="text-[#8458B3] dark:text-[#D0BDF4] font-medium">
+              {showCalculation ? 'Hide calculation details ▲' : 'View calculation details ▼'}
+            </span>
+          </button>
+
+          {showCalculation && data.howCalculated && (
+            <div className="mt-3 p-4 rounded-xl vf-inner-card space-y-4 text-xs">
+              {/* Formula & Points Summary */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-lg bg-white/50 dark:bg-black/20 border border-[#494D5F]/10 dark:border-[#D0BDF4]/10">
+                <div>
+                  <span className="font-bold text-[#494D5F] dark:text-white">Formula: </span>
+                  <span className="font-mono text-[11px] text-[#5d6180] dark:text-[#E5EAF5]/80">
+                    raw = (points earned / weight of checks run) × 100
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="font-bold text-[#8458B3] dark:text-[#D0BDF4]">
+                    {data.howCalculated.pointsEarned} / {data.howCalculated.performedWeight} pts earned
+                  </span>
+                  {data.howCalculated.rawScore !== null && (
+                    <span className="text-[#5d6180] dark:text-[#E5EAF5]/70 ml-1">
+                      (Raw: {data.howCalculated.rawScore}%)
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Applied Caps */}
+              {data.howCalculated.capsApplied && data.howCalculated.capsApplied.length > 0 && (
+                <div className="p-3 rounded-lg bg-[#B26A00]/10 border border-[#B26A00]/30 space-y-1.5">
+                  <div className="flex items-center gap-1.5 font-bold text-[#B26A00]">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    <span>Score Caps Applied:</span>
+                  </div>
+                  <ul className="list-disc list-inside space-y-1 text-[#494D5F] dark:text-[#E5EAF5] text-[11px]">
+                    {data.howCalculated.capsApplied.map((cap, i) => (
+                      <li key={i}>{cap}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* 8 Checks Audit List */}
+              <div className="space-y-2">
+                <h4 className="font-bold uppercase tracking-wider text-[11px] text-[#5d6180] dark:text-[#E5EAF5]/70">
+                  Individual Check Results (Total Weight: 100)
+                </h4>
+                <div className="divide-y divide-[#494D5F]/10 dark:divide-[#D0BDF4]/10">
+                  {(data.howCalculated.checks || []).map((chk) => (
+                    <div key={chk.id} className="py-2.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-[#494D5F] dark:text-white">{chk.name}</span>
+                          <span className="text-[10px] font-mono text-[#5d6180]">
+                            ({chk.weight} pts)
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-[#5d6180] dark:text-[#E5EAF5]/80">
+                          {chk.description}
+                        </p>
+                        {!chk.performed && chk.tip && (
+                          <p className="text-[11px] text-[#8458B3] dark:text-[#D0BDF4] font-medium">
+                            💡 How to check: {chk.tip}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          chk.status === 'pass'
+                            ? 'bg-[#14803C]/15 border-[#14803C]/30 text-[#14803C]'
+                            : chk.status === 'warning'
+                              ? 'bg-[#B26A00]/15 border-[#B26A00]/30 text-[#B26A00]'
+                              : chk.status === 'fail'
+                                ? 'bg-[#C62828]/15 border-[#C62828]/30 text-[#C62828]'
+                                : 'bg-slate-200/50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-500'
+                        }`}>
+                          {chk.status === 'pass' ? `Passed (+${chk.points} pts)` : chk.status === 'warning' ? `Warning (+${chk.points} pts)` : chk.status === 'fail' ? 'Failed (0 pts)' : 'Not checked'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-2 text-[11px] text-[#5d6180] dark:text-[#E5EAF5]/70 italic">
+                * This score is a guide, not a probability or legal proof.
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 2. Top Reasons Quoting the Mail */}
@@ -288,7 +400,7 @@ export function DashboardHeader({ data, onReset, lang = 'en' }) {
         <div className="p-3.5 rounded-xl vf-inner-card text-[#5d6180] dark:text-[#E5EAF5]/70 text-xs flex items-center gap-2.5">
           <HelpCircle className="w-4 h-4 text-[#5d6180] shrink-0" />
           <span className="leading-relaxed">
-            <strong>Disclaimer:</strong> VeriFirm assessment results are evidence-based risk indicators and do not constitute legal proof or corporate certification.
+            <strong>Disclaimer:</strong> This score is a guide, not a probability or legal proof.
           </span>
         </div>
       </div>

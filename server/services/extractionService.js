@@ -153,8 +153,13 @@ export function extractEntitiesFromInput(inputText, inputType = 'text', userProv
   let feeSnippet = null;
   for (const pattern of feePatterns) {
     if (pattern.test(text)) {
-      feeSnippet = extractSnippet(text, pattern);
-      break;
+      const snippet = extractSnippet(text, pattern);
+      const isNegated = /(?:no|never|not|neither|without|do\s*not|does\s*not)\s+(?:charge|ask|demand|require|collect|pay|pay\s*any|need)[\s\w]{0,30}(?:fee|deposit|money|charge)/i.test(snippet || '') ||
+                        /\bno\s+(?:application|onboarding|registration|security)?\s*(?:fee|deposit)\b/i.test(snippet || '');
+      if (!isNegated) {
+        feeSnippet = snippet;
+        break;
+      }
     }
   }
   const moneyDemanded = !!feeSnippet;
@@ -231,8 +236,9 @@ export function extractEntitiesFromInput(inputText, inputType = 'text', userProv
   const corporateSuffixRegex = /\b([A-Z][A-Za-z0-9&.,' -]{1,40}?\s+(?:Pvt\.?\s*Ltd\.?|Private\s+Limited|Ltd\.?|Limited|LLP|Inc\.?))\b/i;
   const corporateSuffixMatch = text.match(corporateSuffixRegex);
   if (corporateSuffixMatch && !isGenericPlatformOrTool(corporateSuffixMatch[1])) {
-    const candidate = corporateSuffixMatch[1].trim().replace(/^[,\s.-]+/, '').replace(/[.,;!]+$/, '').trim();
-    if (candidate.length >= 3 && candidate.length <= 60) {
+    let candidate = corporateSuffixMatch[1].trim().replace(/^[,\s.-]+/, '').replace(/[.,;!]+$/, '').trim();
+    candidate = candidate.replace(/^(?:(?:appointment|offer|selection|joining)?\s*letter\s+(?:at|from|with)\s+|offer\s+from\s+|joining\s+at\s+|team\s+at\s+)/i, '').trim();
+    if (candidate.length >= 3 && candidate.length <= 60 && !isGenericPlatformOrTool(candidate)) {
       detectedCompanyName = candidate;
     }
   }
@@ -262,9 +268,10 @@ export function extractEntitiesFromInput(inputText, inputType = 'text', userProv
 
   // 2. Explicit Company Header in text (e.g., Company Name: ..., Offer from: ..., Welcome to: ...)
   if (!detectedCompanyName) {
-    const companyHeaderMatch = text.match(/(?:welcome(?:\s+you)?\s+to|company\s*name|organization|employer|offer\s*from|position\s*(?:at|with)|role\s*(?:at|with)|team\s*at|opportunity\s*at|joining\s+(?:the\s+team\s+at\s+|our\s+team\s+at\s+|at\s+)?(?!date\b))[:\s]+([A-Za-z0-9\s&.,'!-]{3,50})/i);
+    const companyHeaderMatch = text.match(/(?:welcome(?:\s+you)?\s+to|company\s*name|organization|employer|(?:appointment\s+|offer\s+|selection\s+)?letter\s+from|offer\s*from|position\s*(?:at|with)|role\s*(?:at|with)|team\s*at|opportunity\s*at|joining\s+(?:the\s+team\s+at\s+|our\s+team\s+at\s+|at\s+)?(?!date\b))[:\s]+([A-Za-z0-9\s&.,'!-]{3,50})/i);
     if (companyHeaderMatch) {
       let rawName = companyHeaderMatch[1].trim();
+      rawName = rawName.replace(/^(?:appointment\s+letter\s+from|offer\s+letter\s+from|letter\s+from|offer\s+from)\s+/i, '');
       rawName = rawName.split(/[!.\n\r]/)[0];
       rawName = rawName.split(/\s+(?:we\s+are|dear|candidate|applicant|please|is\s+pleased|your\s+joining)\b/i)[0];
       const candidate = rawName.replace(/[.,;!]+$/, '').trim();
@@ -328,7 +335,7 @@ export function extractEntitiesFromInput(inputText, inputType = 'text', userProv
   }
 
   if (!detectedCompanyName) {
-    detectedCompanyName = 'Unspecified';
+    detectedCompanyName = 'Unspecified organisation';
   }
 
   // Determine Corporate Domain (strictly distinct from social media hosts, shorteners, cloud platforms, and free-mail)
