@@ -464,13 +464,13 @@ export default function App() {
               <PhysicalFootprintSection physical={analysisData.physical} />
 
               {/* 4. LinkedIn Profile & Headcount */}
-              <LinkedInSection linkedin={analysisData.linkedin} />
+              <LinkedInSection linkedin={analysisData.linkedin} companyName={analysisData.companyName} />
 
               {/* 5. Financial Information & Stock Filings */}
               <StockFinanceSection stocks={analysisData.stocks} />
 
               {/* 6. Community Discussions (Reddit) */}
-              <RedditSentimentSection redditAndReviews={analysisData.redditAndReviews} />
+              <RedditSentimentSection redditAndReviews={analysisData.redditAndReviews} companyName={analysisData.companyName} />
 
               {/* 7. Offer Letter Document Text Audit (if extracted/uploaded) */}
               {analysisData.offerLetterQuality && (

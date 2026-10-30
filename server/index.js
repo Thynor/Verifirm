@@ -7,6 +7,7 @@ import { extractEntitiesFromInput } from './services/extractionService.js';
 import { runComprehensiveAudit } from './services/scamDetector.js';
 import { extractTextFromImage } from './services/ocrService.js';
 import { registerUser, loginUser } from './services/authService.js';
+import { getRedditAndReviewSentiment } from './services/redditService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -125,6 +126,21 @@ app.post('/api/analyze', async (req, res) => {
   } catch (err) {
     console.error('Error during analysis:', err);
     res.status(500).json({ error: 'Analysis failed: ' + (err.message || 'Unknown error') });
+  }
+});
+
+// Real-Time Community Discussions Search (Reddit)
+app.get('/api/search/reddit', async (req, res) => {
+  try {
+    const q = req.query.q || '';
+    if (!q || !q.trim()) {
+      return res.status(400).json({ error: 'Search query parameter q is required.' });
+    }
+    const result = await getRedditAndReviewSentiment(q.trim(), q.trim());
+    return res.json(result);
+  } catch (err) {
+    console.error('Error during Reddit search:', err);
+    res.status(500).json({ error: 'Search failed: ' + err.message });
   }
 });
 
