@@ -458,19 +458,19 @@ export default function App() {
               <DigitalIdentitySection digitalIdentity={analysisData.digitalIdentity} />
 
               {/* 2. Government & Corporate Registries */}
-              <GovernmentSection government={analysisData.government} />
+              <GovernmentSection government={analysisData.government} companyName={analysisData.companyName} />
 
               {/* 3. Physical Office Location */}
-              <PhysicalFootprintSection physical={analysisData.physical} />
+              <PhysicalFootprintSection physical={analysisData.physical} companyName={analysisData.companyName} />
 
               {/* 4. LinkedIn Profile & Headcount */}
               <LinkedInSection linkedin={analysisData.linkedin} companyName={analysisData.companyName} />
 
               {/* 5. Financial Information & Stock Filings */}
-              <StockFinanceSection stocks={analysisData.stocks} />
+              <StockFinanceSection stocks={analysisData.stocks} companyName={analysisData.companyName} />
 
-              {/* 6. Community Discussions (Reddit) */}
-              <RedditSentimentSection redditAndReviews={analysisData.redditAndReviews} companyName={analysisData.companyName} />
+              {/* 6. Community Discussions (Reddit & Quora) */}
+              <RedditSentimentSection redditAndReviews={analysisData.redditAndReviews} quora={analysisData.quora} companyName={analysisData.companyName} />
 
               {/* 7. Offer Letter Document Text Audit (if extracted/uploaded) */}
               {analysisData.offerLetterQuality && (

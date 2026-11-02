@@ -38,8 +38,11 @@ export async function getCompanyFinancials(companyName, tickerHint = null) {
         // Find matching EQUITY quote
         const match = quotes.find(q => {
           if (q.quoteType !== 'EQUITY' || !q.symbol) return false;
+          const symBase = q.symbol.split('.')[0].toLowerCase();
+          const cleanLower = cleanName.toLowerCase();
+          if (symBase === cleanLower) return true;
           const qName = ((q.shortname || '') + ' ' + (q.longname || '')).toLowerCase();
-          const words = cleanName.toLowerCase().split(/\s+/).filter(w => w.length > 2 && !['pvt','ltd','private','limited','inc','corp','llc'].includes(w));
+          const words = cleanLower.split(/\s+/).filter(w => w.length > 2 && !['pvt','ltd','private','limited','inc','corp','llc'].includes(w));
           return words.length > 0 && words.some(w => qName.includes(w));
         });
 
@@ -53,12 +56,12 @@ export async function getCompanyFinancials(companyName, tickerHint = null) {
 
     if (!symbol) {
       return {
-        status: 'not_checked',
+        status: 'unlisted_warning',
         isPublic: false,
         ticker: null,
-        source: null,
-        checkedAt: null,
-        message: `No public stock exchange listing or ticker found for "${cleanName}". Unlisted private entity or non-corporate organization.`
+        source: `Public Stock Exchange Directory (NSE, BSE, NYSE, NASDAQ), ${checkedAt.split('T')[0]}`,
+        checkedAt,
+        message: `No public stock market listing or equity valuation found for "${cleanName}". Warning: Unlisted private entity or non-corporate organization.`
       };
     }
 

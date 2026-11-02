@@ -4,10 +4,11 @@ import {
   ExternalLink, Hash, Landmark, Search, ChevronDown, ChevronUp
 } from 'lucide-react';
 
-export function GovernmentSection({ government = {}, defaultExpanded = true }) {
+export function GovernmentSection({ government = {}, defaultExpanded = true, companyName = '' }) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const {
     status = 'not_checked',
+    isRegistered = false,
     cin = null,
     cinValid = false,
     listingStatus = null,
@@ -15,13 +16,37 @@ export function GovernmentSection({ government = {}, defaultExpanded = true }) {
     state = null,
     yearOfIncorporation = null,
     companyType = null,
+    description = null,
+    source = null,
     taxIdentifiers = null,
     officialPortalUrl = 'https://www.mca.gov.in/mcafoportal/viewCompanyMasterData.do',
     officialGstUrl = 'https://services.gst.gov.in/services/searchtp',
     message = 'No statutory Corporate Identification Number (CIN) was provided in the input text.'
   } = government;
 
+  const targetCompany = (companyName || government.companyName || '').trim();
   const hasCin = Boolean(cin);
+
+  const getBadge = () => {
+    if (cinValid || status === 'registered' || isRegistered) {
+      return {
+        label: cinValid ? 'Valid Statutory CIN' : '✓ Registered Company (MCA)',
+        className: 'bg-status-success/10 text-status-success border-status-success/30 font-bold'
+      };
+    }
+    if (status === 'not_registered') {
+      return {
+        label: '⚠️ Not Registered on MCA',
+        className: 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/35 font-bold'
+      };
+    }
+    return {
+      label: 'No Data / Not Checked',
+      className: 'bg-slate-100 dark:bg-slate-800/80 text-muted dark:text-lavender/80 border-slate-200 dark:border-slate-700'
+    };
+  };
+
+  const badge = getBadge();
 
   return (
     <div className="vf-card overflow-hidden">
@@ -35,18 +60,14 @@ export function GovernmentSection({ government = {}, defaultExpanded = true }) {
             <Landmark className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-base sm:text-lg font-bold text-vfslate dark:text-mist flex items-center gap-2">
+            <h2 className="text-base sm:text-lg font-bold text-vfslate dark:text-mist flex items-center gap-2 flex-wrap">
               <span>Government & Corporate Registries (MCA / GSTIN)</span>
-              <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${
-                cinValid 
-                  ? 'bg-status-success/10 text-status-success border-status-success/30 font-bold' 
-                  : 'bg-slate-100 dark:bg-slate-800/80 text-muted dark:text-lavender/80 border-slate-200 dark:border-slate-700'
-              }`}>
-                {cinValid ? 'Valid Statutory CIN' : 'No Data / Not Checked'}
+              <span className={`text-[11px] px-2.5 py-0.5 rounded-full border ${badge.className}`}>
+                {badge.label}
               </span>
             </h2>
             <p className="text-xs text-muted dark:text-lavender/80">
-              Validating Ministry of Corporate Affairs (mca.gov.in) statutory structure and GSTIN tax records
+              Validating Ministry of Corporate Affairs (mca.gov.in) statutory master data and corporate status
             </p>
           </div>
         </div>
@@ -56,7 +77,7 @@ export function GovernmentSection({ government = {}, defaultExpanded = true }) {
             href={officialPortalUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="vf-btn-secondary px-3 py-1.5 text-xs inline-flex items-center gap-1.5"
+            className="vf-btn-secondary px-3 py-1.5 text-xs inline-flex items-center gap-1.5 font-semibold"
           >
             <span>Official MCA Portal</span>
             <ExternalLink className="w-3.5 h-3.5" />
@@ -84,10 +105,15 @@ export function GovernmentSection({ government = {}, defaultExpanded = true }) {
                   <Building2 className="w-4 h-4 text-violet dark:text-lavender" />
                   <span>Ministry of Corporate Affairs (MCA) Record</span>
                 </span>
-                {cinValid ? (
+                {cinValid || status === 'registered' ? (
                   <span className="text-xs font-mono px-2 py-0.5 rounded bg-status-success/10 text-status-success border border-status-success/30 flex items-center gap-1 font-semibold">
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Format Verified</span>
+                    <span>{cinValid ? 'Format Verified' : 'Registered Entity'}</span>
+                  </span>
+                ) : status === 'not_registered' ? (
+                  <span className="text-xs font-mono px-2 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 flex items-center gap-1 font-bold">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    <span>Not Found on MCA</span>
                   </span>
                 ) : (
                   <span className="text-xs font-mono px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-muted dark:text-lavender/80 border border-slate-200 dark:border-slate-700">
@@ -122,6 +148,59 @@ export function GovernmentSection({ government = {}, defaultExpanded = true }) {
                   <div className="p-3 rounded-lg bg-violet/10 dark:bg-violet/20 border border-violet/25 text-[11px] text-vfslate dark:text-mist font-sans mt-3">
                     <strong>Statutory Verification Notice:</strong> The CIN format matches statutory Indian Ministry of Corporate Affairs rules. Live director list, authorized capital, and annual returns can be verified directly on the MCA portal using the official link above.
                   </div>
+                </div>
+              ) : status === 'registered' ? (
+                <div className="space-y-3 text-xs">
+                  <div className="p-4 rounded-xl bg-status-success/10 border border-status-success/30 space-y-2">
+                    <div className="flex items-center gap-2 text-status-success font-bold text-sm">
+                      <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      <span>✓ Registered Corporate Entity Confirmed</span>
+                    </div>
+                    <p className="text-vfslate/90 dark:text-mist/90 text-xs leading-relaxed">
+                      <strong>{targetCompany}</strong> is recognized in statutory corporate registries.
+                    </p>
+                    {description && (
+                      <p className="text-muted dark:text-lavender/80 text-[11px]">
+                        Entity Classification: {description}
+                      </p>
+                    )}
+                    <span className="text-[10px] font-mono text-muted dark:text-lavender/70 block pt-1">
+                      Source: {source || 'MCA & Corporate Master Data'}
+                    </span>
+                  </div>
+
+                  <a
+                    href={officialPortalUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="vf-btn-secondary px-3 py-1.5 text-xs inline-flex items-center gap-1.5 font-mono w-full justify-center"
+                  >
+                    <span>Verify Master Data on MCA Portal ↗</span>
+                  </a>
+                </div>
+              ) : status === 'not_registered' ? (
+                <div className="space-y-3 text-xs">
+                  <div className="p-4 rounded-xl bg-amber-500/15 border border-amber-500/35 space-y-2.5">
+                    <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-bold text-sm">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      <span>⚠️ Company Not Registered on MCA Portal</span>
+                    </div>
+                    <p className="text-vfslate/90 dark:text-mist/90 text-xs leading-relaxed">
+                      {message || `No Ministry of Corporate Affairs (MCA) registration or corporate master data found for "${targetCompany}".`}
+                    </p>
+                    <div className="p-2.5 rounded-lg bg-white/80 dark:bg-[#2f3242]/80 border border-amber-500/20 text-[11px] text-muted dark:text-lavender/80">
+                      <strong>Legal Warning:</strong> Unregistered entities have no statutory existence under the Companies Act 2013 and cannot legally issue employment contracts or valid Form 16 TDS certificates.
+                    </div>
+                  </div>
+
+                  <a
+                    href={officialPortalUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="vf-btn-secondary px-3 py-1.5 text-xs inline-flex items-center gap-1.5 font-mono w-full justify-center"
+                  >
+                    <span>Search MCA Master Data for '{targetCompany}' ↗</span>
+                  </a>
                 </div>
               ) : (
                 <div className="p-4 rounded-xl bg-white/60 dark:bg-[#2f3242]/60 border border-slate-300/40 dark:border-slate-600/40 space-y-3 text-xs">

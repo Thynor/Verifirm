@@ -6,19 +6,24 @@ import { lookupGovernmentRegistry } from './mcaService.js';
 import { analyzeLinkedInPresence } from './linkedinService.js';
 import { getCompanyFinancials } from './financeService.js';
 import { getRedditAndReviewSentiment } from './redditService.js';
+import { getQuoraDiscussions } from './quoraService.js';
 import { evaluateOfferLetterQuality } from './offerLetterService.js';
 
-function resolvePhysicalFootprint({ detectedAddress, detectedPhone, detectedEmail, detectedDomain, isUserProvidedAddress = false }) {
+async function resolvePhysicalFootprint({ detectedCompanyName, detectedAddress, detectedPhone, detectedEmail, detectedDomain, isUserProvidedAddress = false }) {
   const checkedAt = new Date().toISOString();
+  const dateStr = checkedAt.split('T')[0];
 
+  // 1. If explicit address was provided by user or detected in text
   if (detectedAddress) {
     const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(detectedAddress)}`;
+    const embedMapsUrl = `https://maps.google.com/maps?q=${encodeURIComponent(detectedAddress)}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
     return {
       status: isUserProvidedAddress ? 'user_provided' : 'found_in_input',
       officeAddress: detectedAddress,
       source: isUserProvidedAddress ? 'Entered by user (user-provided)' : 'Extracted from user input text',
       checkedAt,
       mapUrl,
+      embedMapsUrl,
       contactDetails: {
         phone: detectedPhone || 'Not specified',
         email: detectedEmail || 'Not specified',
@@ -30,18 +35,91 @@ function resolvePhysicalFootprint({ detectedAddress, detectedPhone, detectedEmai
     };
   }
 
+  // 2. If no address was in input, lookup company address by company name via public geographic directory
+  const cleanName = (detectedCompanyName || '').trim();
+  const isGeneric = !cleanName ||
+    cleanName.toLowerCase() === 'unspecified organisation' ||
+    cleanName.toLowerCase() === 'unspecified organization' ||
+    cleanName.toLowerCase() === 'unspecified';
+
+  if (!isGeneric) {
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cleanName)}&format=json&addressdetails=1&limit=3`;
+      const res = await fetch(url, {
+        headers: { 'User-Agent': 'VeriFirmAudit/2.0 (audit@verifirm.org)' },
+        signal: AbortSignal.timeout(3500)
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const results = Array.isArray(data) ? data : [];
+        const commercialTypes = ['office', 'commercial', 'landuse', 'industrial', 'building', 'company', 'amenity'];
+
+        const matched = results.find(item => {
+          const isBuilding = commercialTypes.includes(item.class) || commercialTypes.includes(item.type);
+          const nameMatches = item.name && (
+            item.name.toLowerCase().includes(cleanName.toLowerCase()) || 
+            cleanName.toLowerCase().includes(item.name.toLowerCase())
+          );
+          const isExcluded = ['beauty', 'hairdresser', 'village', 'clothes'].includes(item.type);
+          return isBuilding && nameMatches && !isExcluded;
+        });
+
+        if (matched) {
+          const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(matched.display_name)}`;
+          const embedMapsUrl = `https://maps.google.com/maps?q=${encodeURIComponent(matched.display_name)}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
+          return {
+            status: 'found_online',
+            officeAddress: matched.display_name,
+            source: `OpenStreetMap Geographic Directory, ${dateStr}`,
+            checkedAt,
+            mapUrl,
+            embedMapsUrl,
+            lat: matched.lat,
+            lon: matched.lon,
+            contactDetails: {
+              phone: detectedPhone || 'Not specified',
+              email: detectedEmail || 'Not specified',
+              website: detectedDomain ? (detectedDomain.startsWith('http') ? detectedDomain : `https://${detectedDomain}`) : 'Not specified'
+            },
+            message: `Registered commercial office building found: "${matched.display_name}".`
+          };
+        }
+      }
+    } catch (e) {
+      // Nominatim timeout or error
+    }
+
+    // Company searched, but no registered commercial building found
+    return {
+      status: 'no_building_found',
+      officeAddress: null,
+      source: `OpenStreetMap Geographic Directory, ${dateStr}`,
+      checkedAt,
+      mapUrl: null,
+      embedMapsUrl: null,
+      contactDetails: {
+        phone: detectedPhone || 'Not provided in input',
+        email: detectedEmail || 'Not provided in input',
+        website: detectedDomain ? (detectedDomain.startsWith('http') ? detectedDomain : `https://${detectedDomain}`) : 'Not provided in input'
+      },
+      message: `This company does not have a registered commercial office building in public geographic records.`
+    };
+  }
+
   return {
     status: 'not_checked',
     officeAddress: null,
     source: null,
     checkedAt: null,
     mapUrl: null,
+    embedMapsUrl: null,
     contactDetails: {
       phone: detectedPhone || 'Not provided in input',
       email: detectedEmail || 'Not provided in input',
       website: detectedDomain ? (detectedDomain.startsWith('http') ? detectedDomain : `https://${detectedDomain}`) : 'Not provided in input'
     },
-    message: 'No physical office address was provided in the input.'
+    message: 'No physical office address or company name was provided in the input.'
   };
 }
 
@@ -67,7 +145,7 @@ export async function runComprehensiveAudit(extractedData, userProvidedDetails =
   const digitalIdentity = await analyzeEmailAndDomain(detectedEmail, detectedDomain, detectedCompanyName, flags);
 
   // 2. Government & Corporate Registry
-  const government = lookupGovernmentRegistry(detectedCompanyName, cin, gstin);
+  const government = await lookupGovernmentRegistry(detectedCompanyName, cin, gstin);
 
   // 3. LinkedIn Forensics (100% truthful, no fake avatars)
   const linkedin = analyzeLinkedInPresence(detectedCompanyName, linkedInUrl);
@@ -81,8 +159,12 @@ export async function runComprehensiveAudit(extractedData, userProvidedDetails =
   // 6. Real Reddit Community Discussions (no fake stars/reviews)
   const redditAndReviews = await getRedditAndReviewSentiment(detectedCompanyName);
 
-  // 7. Physical Footprint & Map: Address ONLY from input or user-provided
-  const physical = resolvePhysicalFootprint({
+  // 7. Quora Discussions & Fraud Checks
+  const quora = await getQuoraDiscussions(detectedCompanyName);
+
+  // 8. Physical Footprint & Map: Address from input or geographic registry
+  const physical = await resolvePhysicalFootprint({
+    detectedCompanyName,
     detectedAddress,
     detectedPhone,
     detectedEmail,
@@ -90,11 +172,33 @@ export async function runComprehensiveAudit(extractedData, userProvidedDetails =
     isUserProvidedAddress: !!(details?.companyAddress)
   });
 
-  // 8. Concrete Rules & Checks Performed Tracking
+  // Concrete Rules & Checks Performed Tracking
   const redFlags = [];
   const greenFlags = [];
 
   const hasTextToEvaluate = rawText && rawText.length >= 30;
+
+  // Physical Building & Premises Verification Flags
+  if (physical.status === 'no_building_found' && hasTextToEvaluate) {
+    redFlags.push({
+      rule: 'No Physical Building / Premises Found',
+      severity: 'MEDIUM',
+      description: `No registered commercial office building found for "${detectedCompanyName}" in public geographic records. Virtual-only entities carry elevated risk.`
+    });
+  } else if (physical.status === 'found_online') {
+    greenFlags.push(`Commercial office building verified: ${physical.officeAddress}`);
+  }
+
+  // MCA Corporate Registration Flags
+  if (government.status === 'not_registered' && hasTextToEvaluate) {
+    redFlags.push({
+      rule: 'Company Not Registered on MCA / Corporate Portals',
+      severity: 'HIGH',
+      description: `No formal corporate registration found on the Ministry of Corporate Affairs (MCA) registry for "${detectedCompanyName}". Unregistered entities cannot legally execute employment contracts.`
+    });
+  } else if (government.status === 'registered') {
+    greenFlags.push(`Company "${government.companyName}" verified in corporate registries (${government.description || 'Registered Company'})`);
+  }
 
   // Ingest Unusual Job Typologies & Severe Scams
   if (flags.isTypingJob) {
@@ -440,7 +544,7 @@ export async function runComprehensiveAudit(extractedData, userProvidedDetails =
   }
 
   // Check 8: Physical Operating Address & Offer Terms (Weight: 10)
-  const hasAddress = physical.status === 'found_in_input' || physical.status === 'user_provided';
+  const hasAddress = physical.status === 'found_in_input' || physical.status === 'user_provided' || physical.status === 'found_online';
   const hasOfferQuality = isOfferLetter && /(?:₹|rs\.?|inr|salary|stipend|ctc|lpa|position|role|appointment)/i.test(rawText || '');
   const addressOfferPerformed = hasAddress || hasOfferQuality;
   let addressOfferStatus = 'not_run';
@@ -455,13 +559,13 @@ export async function runComprehensiveAudit(extractedData, userProvidedDetails =
     } else if (hasAddress && hasOfferQuality) {
       addressOfferStatus = 'pass';
       addressOfferPoints = 10;
-      addressOfferDesc = `Operating office address disclosed with professional offer terms.`;
-      greenFlags.push('Operating address disclosed in communication');
+      addressOfferDesc = `Operating office address verified with professional offer terms.`;
+      greenFlags.push('Operating address disclosed or verified in records');
     } else {
       addressOfferStatus = 'warning';
       addressOfferPoints = 5;
-      addressOfferDesc = hasAddress ? 'Office address disclosed, but formal offer terms are partial.' : 'Offer terms outlined, but physical office address is missing.';
-      if (hasAddress) greenFlags.push('Operating address disclosed in communication');
+      addressOfferDesc = hasAddress ? 'Office address verified, but formal appointment terms are partial.' : 'Offer terms outlined, but physical office building is missing.';
+      if (hasAddress) greenFlags.push('Operating address disclosed or verified in records');
     }
   }
 
@@ -822,6 +926,7 @@ export async function runComprehensiveAudit(extractedData, userProvidedDetails =
     offerLetterQuality,
     physical,
     redditAndReviews,
+    quora,
     userProvidedDetails: details,
     legalDisclaimer: 'This score is a guide, not a probability or legal proof.',
     timestamp: new Date().toISOString()

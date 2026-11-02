@@ -8,6 +8,7 @@ import { runComprehensiveAudit } from './services/scamDetector.js';
 import { extractTextFromImage } from './services/ocrService.js';
 import { registerUser, loginUser } from './services/authService.js';
 import { getRedditAndReviewSentiment } from './services/redditService.js';
+import { getQuoraDiscussions } from './services/quoraService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -140,6 +141,21 @@ app.get('/api/search/reddit', async (req, res) => {
     return res.json(result);
   } catch (err) {
     console.error('Error during Reddit search:', err);
+    res.status(500).json({ error: 'Search failed: ' + err.message });
+  }
+});
+
+// Community Discussions & Fraud Reports (Quora)
+app.get('/api/search/quora', async (req, res) => {
+  try {
+    const q = req.query.q || '';
+    if (!q || !q.trim()) {
+      return res.status(400).json({ error: 'Search query parameter q is required.' });
+    }
+    const result = await getQuoraDiscussions(q.trim());
+    return res.json(result);
+  } catch (err) {
+    console.error('Error during Quora search:', err);
     res.status(500).json({ error: 'Search failed: ' + err.message });
   }
 });

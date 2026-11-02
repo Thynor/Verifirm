@@ -3,6 +3,7 @@ import assert from 'assert';
 import { extractEntitiesFromInput } from '../services/extractionService.js';
 import { runComprehensiveAudit } from '../services/scamDetector.js';
 import { lookupRdapDomain, lookupDnsAuthRecords } from '../services/networkCheckService.js';
+import { getQuoraDiscussions } from '../services/quoraService.js';
 
 async function runTests() {
   console.log('--- STARTING VERIFIRM PHASE 1 EVIDENCE-BASED VERIFICATION TESTS ---\n');
@@ -253,8 +254,102 @@ Human Resources Team, Example Corp Pvt Ltd`;
     console.log('✓ Test 9 Passed: User-provided details correctly incorporated and labeled.\n');
   }
 
+  // Test 10: Physical Office Building Check by Company Name
+  console.log('Running Test 10: Physical Office Building Check (Registered office vs virtual-only entity)...');
+  {
+    // A. Unregistered entity with no physical building
+    const inputVirtual = `From: hr@virtual-unknown-corp.org\nSubject: Remote Internship Offer\nDear Candidate, Welcome to CodeAlpha.`;
+    const extVirtual = extractEntitiesFromInput(inputVirtual, 'text');
+    const resVirtual = await runComprehensiveAudit(extVirtual);
+
+    console.log('  Virtual Company physical status:', resVirtual.physical.status);
+    console.log('  Virtual Company message:', resVirtual.physical.message);
+    assert.strictEqual(resVirtual.physical.status, 'no_building_found', 'Unknown/virtual company must return no_building_found status');
+    assert(resVirtual.physical.message.includes('does not have a registered commercial office building'), 'Message must declare company does not have registered building');
+
+    // B. Real company with registered premises
+    const inputReal = `From: hr@tcs.com\nSubject: Employment Letter\nDear Candidate, Welcome to Tata Consultancy Services.`;
+    const extReal = extractEntitiesFromInput(inputReal, 'text');
+    const resReal = await runComprehensiveAudit(extReal);
+
+    console.log('  Real Company physical status:', resReal.physical.status);
+    console.log('  Real Company address:', resReal.physical.officeAddress);
+    assert.strictEqual(resReal.physical.status, 'found_online', 'Company with registered commercial premises must return found_online');
+    assert(resReal.physical.officeAddress && resReal.physical.officeAddress.length > 5, 'Must provide verified street/office address');
+    console.log('✓ Test 10 Passed: Physical office building lookup accurately distinguishes registered premises from virtual entities.\n');
+  }
+
+  // Test 11: MCA Portal Registration Check by Company Name
+  console.log('Running Test 11: MCA Portal Registration Check (Registered corporate entity vs unlisted/unregistered)...');
+  {
+    // A. Unregistered entity on MCA
+    const inputUnreg = `From: careers@codealpha.co\nSubject: Selection Letter\nDear Candidate, You are selected at CodeAlpha.`;
+    const extUnreg = extractEntitiesFromInput(inputUnreg, 'text');
+    const resUnreg = await runComprehensiveAudit(extUnreg);
+
+    console.log('  Unregistered MCA status:', resUnreg.government.status);
+    console.log('  Unregistered isRegistered:', resUnreg.government.isRegistered);
+    assert.strictEqual(resUnreg.government.status, 'not_registered', 'Entity not found on MCA must return not_registered');
+    assert.strictEqual(resUnreg.government.isRegistered, false, 'isRegistered must be false');
+    assert(resUnreg.government.message.includes('No Ministry of Corporate Affairs (MCA) registration'), 'Message must indicate no MCA registration found');
+
+    // B. Registered corporate entity
+    const inputReg = `From: hr@infosys.com\nSubject: Appointment Offer\nDear Candidate, Welcome to Infosys.`;
+    const extReg = extractEntitiesFromInput(inputReg, 'text');
+    const resReg = await runComprehensiveAudit(extReg);
+
+    console.log('  Registered MCA status:', resReg.government.status);
+    console.log('  Registered isRegistered:', resReg.government.isRegistered);
+    console.log('  Registered Entity Name:', resReg.government.companyName);
+    assert.strictEqual(resReg.government.status, 'registered', 'Registered corporate entity must return registered status');
+    assert.strictEqual(resReg.government.isRegistered, true, 'isRegistered must be true');
+    console.log('✓ Test 11 Passed: MCA corporate registration lookup correctly verifies registered entities and flags unregistered operations.\n');
+  }
+
+  // Test 12: Stock Market Value vs Unlisted Warning
+  console.log('Running Test 12: Stock Market Value vs Unlisted Warning...');
+  {
+    // A. Unlisted entity
+    const inputUnlisted = `From: hr@unknown-startup.io\nSubject: Offer\nDear Candidate, Welcome to CodeAlpha.`;
+    const extUnlisted = extractEntitiesFromInput(inputUnlisted, 'text');
+    const resUnlisted = await runComprehensiveAudit(extUnlisted);
+
+    console.log('  Unlisted stock status:', resUnlisted.stocks.status);
+    console.log('  Unlisted isPublic:', resUnlisted.stocks.isPublic);
+    assert.strictEqual(resUnlisted.stocks.status, 'unlisted_warning', 'Unlisted company must return unlisted_warning');
+    assert.strictEqual(resUnlisted.stocks.isPublic, false, 'isPublic must be false for unlisted company');
+    assert(resUnlisted.stocks.message.includes('Warning: Unlisted'), 'Must include warning message in stocks result');
+
+    // B. Listed public company
+    const inputListed = `From: careers@tcs.com\nSubject: Systems Engineer Offer\nDear Candidate, Congratulations on joining Tata Consultancy Services.`;
+    const extListed = extractEntitiesFromInput(inputListed, 'text');
+    const resListed = await runComprehensiveAudit(extListed);
+
+    console.log('  Listed stock status:', resListed.stocks.status);
+    console.log('  Listed ticker:', resListed.stocks.ticker);
+    console.log('  Listed price:', resListed.stocks.currentPrice);
+    assert.strictEqual(resListed.stocks.isPublic, true, 'Publicly traded security must return isPublic = true');
+    console.log('✓ Test 12 Passed: Publicly traded securities provide live market quotes; unlisted firms return warning status.\n');
+  }
+
+  // Test 13: Quora Discussions Integration
+  console.log('Running Test 13: Quora Discussions Integration...');
+  {
+    const quoraData = await getQuoraDiscussions('CodeAlpha');
+    console.log('  Quora status:', quoraData.status);
+    console.log('  Quora search URL:', quoraData.searchUrl);
+    console.log('  Quora discussions count:', quoraData.discussions.length);
+
+    assert.strictEqual(quoraData.status, 'verified', 'Quora service must return verified status');
+    assert(quoraData.searchUrl.includes('quora.com/search'), 'Search URL must point to Quora search');
+    assert(quoraData.discussions.length >= 4, 'Must generate targeted fraud and legitimacy questions');
+    assert(quoraData.discussions.some(d => d.question.includes('fake or legitimate')), 'Must include fake or legitimate audit question');
+    assert(quoraData.discussions.some(d => d.question.includes('money')), 'Must include advance fee inquiry');
+    console.log('✓ Test 13 Passed: Quora discussions service returns targeted questions with direct deep links.\n');
+  }
+
   console.log('========================================');
-  console.log('ALL PHASE 1 TESTS COMPLETED SUCCESSFULLY (9/9 PASSED)');
+  console.log('ALL PHASE 1 & PHASE 2 TESTS COMPLETED SUCCESSFULLY (13/13 PASSED)');
   console.log('========================================');
 }
 

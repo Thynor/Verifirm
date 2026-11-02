@@ -8,7 +8,7 @@ import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid 
 } from 'recharts';
 
-export function StockFinanceSection({ stocks = {}, defaultExpanded = true }) {
+export function StockFinanceSection({ stocks = {}, defaultExpanded = true, companyName = '' }) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const [activeTimeframe, setActiveTimeframe] = useState('1Y');
 
@@ -31,13 +31,14 @@ export function StockFinanceSection({ stocks = {}, defaultExpanded = true }) {
     growthSummary = null
   } = stocks;
 
+  const targetCompany = (companyName || stocks.companyName || '').trim();
   const isUserProvided = status === 'user_provided' || Boolean(userProvidedFinancials && userProvidedFinancials.length > 0);
   const hasChartData = isPublic && currentPrice && currentPrice !== 'N/A' && timeframes && Object.keys(timeframes).length > 0;
   const currentData = hasChartData ? (timeframes[activeTimeframe] || timeframes['1Y'] || []) : [];
 
   const searchFinanceUrl = ticker 
     ? `https://www.google.com/finance/quote/${encodeURIComponent(ticker)}`
-    : `https://www.google.com/finance`;
+    : `https://www.google.com/finance/search?q=${encodeURIComponent(targetCompany || '')}`;
 
   return (
     <div className="vf-card overflow-hidden">
@@ -51,16 +52,16 @@ export function StockFinanceSection({ stocks = {}, defaultExpanded = true }) {
             <TrendingUp className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-base sm:text-lg font-bold text-vfslate dark:text-mist flex items-center gap-2">
+            <h2 className="text-base sm:text-lg font-bold text-vfslate dark:text-mist flex items-center gap-2 flex-wrap">
               <span>Financial & Stock Market Verification</span>
-              <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${
+              <span className={`text-[11px] px-2.5 py-0.5 rounded-full border ${
                 isUserProvided
                   ? 'bg-violet/15 text-violet dark:text-lavender border-violet/30 font-semibold'
                   : isPublic 
                     ? 'bg-status-success/10 text-status-success border-status-success/30 font-bold' 
-                    : 'bg-slate-100 dark:bg-slate-800/80 text-muted dark:text-lavender/80 border-slate-200 dark:border-slate-700'
+                    : 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/35 font-bold'
               }`}>
-                {isUserProvided ? 'User-Provided Financials' : isPublic ? 'Publicly Listed' : 'Private / Unlisted'}
+                {isUserProvided ? 'User-Provided Financials' : isPublic ? 'Publicly Listed' : '⚠️ Unlisted / No Market Value (Warning)'}
               </span>
             </h2>
             <p className="text-xs text-muted dark:text-lavender/80">
@@ -275,44 +276,60 @@ export function StockFinanceSection({ stocks = {}, defaultExpanded = true }) {
               )}
             </div>
           ) : (
-            /* Unlisted / Non-Public Entity View */
-            <div className="vf-inner-card p-6 space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-violet/15 dark:bg-violet/25 border border-violet/30 flex items-center justify-center text-violet dark:text-lavender">
-                  <Building className="w-5 h-5" />
+            /* Unlisted / Non-Public Entity View - Prominent Warning */
+            <div className="space-y-4">
+              <div className="p-6 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-4">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30 flex items-center justify-center shrink-0 mt-0.5">
+                    <AlertTriangle className="w-5 h-5" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-base font-bold text-amber-900 dark:text-amber-300">
+                      ⚠️ Warning: Unregistered on Stock Exchanges / No Market Capitalization
+                    </h3>
+                    <p className="text-xs text-vfslate/90 dark:text-mist/90 leading-relaxed">
+                      {message || `No public stock exchange listing or equity valuation could be verified for "${targetCompany || 'this organization'}".`}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-base font-bold text-vfslate dark:text-mist">
-                    Unlisted Private Entity / No Public Stock Listing
-                  </h3>
-                  <p className="text-xs text-muted dark:text-lavender/80">
-                    {message || 'No public stock exchange ticker detected in input text.'}
+
+                <div className="p-4 rounded-xl bg-white/80 dark:bg-[#2f3242]/80 border border-amber-500/20 text-xs space-y-2">
+                  <span className="font-semibold text-amber-800 dark:text-amber-300 uppercase tracking-wider text-[10px] font-mono">
+                    Candidate Advisory on Unlisted Entities:
+                  </span>
+                  <p className="text-muted dark:text-mist/90 leading-relaxed">
+                    Unlisted private entities or unregistered organizations do not publish daily stock quotes or public quarterly filings on exchanges like NSE, BSE, NASDAQ, or NYSE. If an offer promises high-value stock options (ESOPs) or pre-IPO equity in lieu of salary, demand certified statutory documentation before accepting.
                   </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs pt-1">
+                  <div className="p-3 rounded-xl bg-white/70 dark:bg-[#2f3242]/70 border border-amber-500/20">
+                    <span className="font-mono text-amber-800 dark:text-amber-300 text-[10px] uppercase font-bold">Unlisted Operations</span>
+                    <p className="text-vfslate dark:text-mist/90 mt-1 text-[11px]">
+                      Private firms are governed by the Ministry of Corporate Affairs (MCA) and do not publish daily market stock quotes.
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-white/70 dark:bg-[#2f3242]/70 border border-amber-500/20">
+                    <span className="font-mono text-amber-800 dark:text-amber-300 text-[10px] uppercase font-bold">Equity Offer Diligence</span>
+                    <p className="text-vfslate dark:text-mist/90 mt-1 text-[11px]">
+                      Never pay security fees or money for employee share allocation. Genuine ESOPs require no upfront capital from candidates.
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              <div className="p-4 rounded-xl bg-white/70 dark:bg-[#2f3242]/70 border border-slate-300/40 dark:border-slate-600/40 space-y-2 text-xs">
-                <span className="font-semibold text-vfslate dark:text-mist uppercase tracking-wider text-[10px] font-mono">
-                  Market Transparency Standard:
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-xl bg-white/60 dark:bg-[#2f3242]/60 border border-slate-300/40 dark:border-slate-600/40 text-xs">
+                <span className="text-muted dark:text-lavender/80">
+                  Search financial markets for alternative listed corporate parents or securities:
                 </span>
-                <p className="text-muted dark:text-mist/90 leading-relaxed">
-                  VeriFirm does not manufacture stock prices, valuation multiples, or synthetic historical performance charts. Public equity analysis requires a verified stock exchange listing (e.g. NSE, BSE, NASDAQ).
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                <div className="p-3.5 rounded-xl bg-white/60 dark:bg-[#2f3242]/60 border border-slate-300/30 dark:border-slate-600/30">
-                  <span className="font-mono text-muted dark:text-lavender/80 text-[10px] uppercase">Startup / Private Operations</span>
-                  <p className="text-vfslate dark:text-mist/90 mt-1">
-                    Legitimate private firms are governed by the Ministry of Corporate Affairs (MCA) and do not publish daily stock quotes. Check CIN records for capital details.
-                  </p>
-                </div>
-                <div className="p-3.5 rounded-xl bg-white/60 dark:bg-[#2f3242]/60 border border-slate-300/30 dark:border-slate-600/30">
-                  <span className="font-mono text-muted dark:text-lavender/80 text-[10px] uppercase">Candidate Advisory</span>
-                  <p className="text-vfslate dark:text-mist/90 mt-1">
-                    If an unknown entity offers stock options (ESOPs) in lieu of salary, demand written articles of association or cap table evidence.
-                  </p>
-                </div>
+                <a
+                  href={`https://www.google.com/finance/search?q=${encodeURIComponent(targetCompany || '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="vf-btn-secondary px-3 py-1.5 text-xs inline-flex items-center gap-1.5 font-mono shrink-0 font-semibold"
+                >
+                  <span>Search Google Finance ↗</span>
+                </a>
               </div>
             </div>
           )}
