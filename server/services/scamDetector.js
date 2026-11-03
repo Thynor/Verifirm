@@ -190,12 +190,17 @@ export async function runComprehensiveAudit(extractedData, userProvidedDetails =
   }
 
   // MCA Corporate Registration Flags
+  const isMsme = !!extractedData.isMsme;
   if (government.status === 'not_registered' && hasTextToEvaluate) {
-    redFlags.push({
-      rule: 'Company Not Registered on MCA / Corporate Portals',
-      severity: 'HIGH',
-      description: `No formal corporate registration found on the Ministry of Corporate Affairs (MCA) registry for "${detectedCompanyName}". Unregistered entities cannot legally execute employment contracts.`
-    });
+    if (isMsme) {
+      greenFlags.push('Operates with registered MSME / Udyam status (Ministry of Micro, Small & Medium Enterprises)');
+    } else {
+      redFlags.push({
+        rule: 'Company Not Registered on MCA / Corporate Portals',
+        severity: 'MEDIUM',
+        description: `No formal corporate registration found on the Ministry of Corporate Affairs (MCA) registry for "${detectedCompanyName}". The business may operate as an MSME, sole proprietorship, partnership, or trade name rather than an incorporated private/public limited company.`
+      });
+    }
   } else if (government.status === 'registered') {
     greenFlags.push(`Company "${government.companyName}" verified in corporate registries (${government.description || 'Registered Company'})`);
   }
@@ -391,7 +396,7 @@ export async function runComprehensiveAudit(extractedData, userProvidedDetails =
   }
 
   // Check 3: Statutory Corporate Registry (MCA / GSTIN) (Weight: 15)
-  const mcaPerformed = !!(government.status === 'found_in_input' || cin || gstin);
+  const mcaPerformed = !!(government.status === 'found_in_input' || government.status === 'registered' || isMsme || cin || gstin);
   let mcaStatus = 'not_run';
   let mcaPoints = 0;
   let mcaDesc = 'No Corporate Identification Number (CIN) or GSTIN provided in input.';
@@ -401,6 +406,15 @@ export async function runComprehensiveAudit(extractedData, userProvidedDetails =
       mcaPoints = 15;
       mcaDesc = `Statutory CIN format decoded: ${government.listingStatus} registered in ${government.state} (${government.yearOfIncorporation})`;
       greenFlags.push(mcaDesc);
+    } else if (government.status === 'registered') {
+      mcaStatus = 'pass';
+      mcaPoints = 15;
+      mcaDesc = `Corporate entity verified in registry: ${government.companyName} (${government.description || 'Incorporated entity'})`;
+      greenFlags.push(mcaDesc);
+    } else if (isMsme) {
+      mcaStatus = 'pass';
+      mcaPoints = 10;
+      mcaDesc = 'Registered MSME / Udyam enterprise (Ministry of Micro, Small & Medium Enterprises).';
     } else {
       mcaStatus = 'fail';
       mcaPoints = 0;
@@ -771,6 +785,12 @@ export async function runComprehensiveAudit(extractedData, userProvidedDetails =
     trustScore = null;
   } else {
     let score = rawScore;
+
+    // Apply proportional adjustment for medium red flags (e.g. unlisted on MCA or unverified map premises)
+    const mediumRedFlagsCount = redFlags.filter(r => r.severity === 'MEDIUM').length;
+    if (mediumRedFlagsCount > 0) {
+      score = Math.max(20, score - (mediumRedFlagsCount * 10));
+    }
 
     // Cap 1: Fewer than 5 checks run -> max 50
     if (performedCount < 5 && score > 50) {

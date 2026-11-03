@@ -348,8 +348,36 @@ Human Resources Team, Example Corp Pvt Ltd`;
     console.log('✓ Test 13 Passed: Quora discussions service returns targeted questions with direct deep links.\n');
   }
 
+  // Test 14: Anti-Date Extraction Guard & Unlisted Startup Scoring
+  console.log('Running Test 14: Date Rejection & Non-Arbitrary Startup Scoring...');
+  {
+    const sampleOffer = `INTERNSHIP OFFER LETTER
+We would like to congratulate you on being selected for the "Java Programming" virtual internship position with "CodSoft". We at CodSoft are excited that you will join our team.
+The duration of the internship will be of 4 weeks, starting from 01 November 2025 to 30 November 2025.
+www.codsoft.in
+contact@codsoft.in`;
+
+    const ext = extractEntitiesFromInput(sampleOffer, 'text');
+    console.log('  Extracted Company:', ext.detectedCompanyName);
+    console.log('  Extracted Domain:', ext.detectedDomain);
+    console.log('  Extracted Email:', ext.detectedEmail);
+
+    assert.notStrictEqual(ext.detectedCompanyName, '01 November 2025 to 30 November', 'Date range must never be extracted as company name');
+    assert.strictEqual(ext.detectedCompanyName.toLowerCase(), 'codsoft', 'Must extract Codsoft as company name');
+    assert.strictEqual(ext.detectedDomain, 'codsoft.in', 'Must extract codsoft.in as corporate domain');
+
+    const res = await runComprehensiveAudit(ext);
+    console.log('  Startup Trust Score:', res.trustScore);
+    console.log('  Startup Risk Level:', res.riskLevel);
+    console.log('  Coverage Ratio:', res.coverageRatio);
+
+    assert(res.trustScore >= 60, 'Unlisted company with clean domain & 0 fee demand must not be artificially capped at 35');
+    assert.strictEqual(res.riskLevel, 'Medium', 'Unregistered entity without criminal indicators must be Medium risk, not High/Critical');
+    console.log('✓ Test 14 Passed: Dates are strictly rejected and unlisted entities receive fair, evidence-based scores.\n');
+  }
+
   console.log('========================================');
-  console.log('ALL PHASE 1 & PHASE 2 TESTS COMPLETED SUCCESSFULLY (13/13 PASSED)');
+  console.log('ALL PHASE 1 & PHASE 2 TESTS COMPLETED SUCCESSFULLY (14/14 PASSED)');
   console.log('========================================');
 }
 

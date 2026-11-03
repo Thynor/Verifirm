@@ -57,6 +57,38 @@ export function isGenericPlatformOrTool(name) {
   return platforms.some(p => n === p || n === p + 's' || n.startsWith(p + ' ') || n.endsWith(' ' + p));
 }
 
+export function isInvalidCompanyName(name) {
+  if (!name || typeof name !== 'string') return true;
+  let clean = name.trim().replace(/^["'“”‘’`]+|["'“”‘’`]+$/g, '').trim();
+  clean = clean.replace(/^[,\s.:;!-]+|[.,:;!-]+$/g, '').trim();
+  if (clean.length < 2 || clean.length > 55) return true;
+
+  if (isGenericPlatformOrTool(clean)) return true;
+
+  // Strict Date / Date Range rejection (e.g. "01 November 2025 to 30 November")
+  const monthNames = /\b(?:january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\b/i;
+  if (monthNames.test(clean) && /\d{1,4}/.test(clean)) return true;
+  if (/^\d{1,2}\s+(?:st|nd|rd|th)?\s*(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i.test(clean)) return true;
+  if (/^\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}/.test(clean)) return true;
+  if (/\b(?:from|to|between|starting|duration|weeks?|months?|days?|stating|period)\b/i.test(clean) && /\d+/.test(clean)) return true;
+  if (/^\d+/.test(clean) && !/^[A-Z0-9]{3,}$/.test(clean)) return true;
+
+  // Boilerplate letter/email phrase rejection
+  const boilerplate = [
+    'congratulate you', 'excited that you', 'selected for', 'virtual internship', 'internship position',
+    'internship offer', 'offer letter', 'appointment letter', 'selection letter', 'best of luck',
+    'thank you', 'terms and conditions', 'code.create.succeed', 'code create succeed',
+    'programming', 'web development', 'java programming', 'python programming', 'data science',
+    'educational opportunity', 'hands-on knowledge', 'lawful and reasonable', 'career goals',
+    'all aspects of your work', 'assigned tasks', 'to the best of your ability', 'dear candidate',
+    'we are pleased', 'joining date', 'stipend', 'duration of', 'weeks starting'
+  ];
+  const lower = clean.toLowerCase();
+  if (boilerplate.some(b => lower.includes(b))) return true;
+
+  return false;
+}
+
 export const THIRD_PARTY_OR_SHORTENER_DOMAINS = [
   'whatsapp.com', 'chat.whatsapp.com', 'wa.me',
   'telegram.org', 't.me', 'telegram.me',
@@ -80,7 +112,7 @@ export function isThirdPartyOrPlatformDomain(domain) {
 
 export function extractSnippet(text, pattern) {
   if (!text) return null;
-  const lines = text.split(/[\r\n]+/);
+  const lines = text.split(/[\n]+/);
   for (const line of lines) {
     if (pattern.test(line)) {
       return line.trim();
@@ -99,13 +131,38 @@ export function extractSnippet(text, pattern) {
 export function extractEntitiesFromInput(inputText, inputType = 'text', userProvidedDetails = null) {
   const text = (inputText || '').trim();
   
-  // Extract URLs
-  const urlRegex = /(https?:\/\/[^\s]+)/gi;
-  const urls = text.match(urlRegex) || [];
+  // Extract URLs (including www.domain.tld without http://)
+  const urlRegex = /(?:https?:\/\/[^\s]+|\b(?:www\.)[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b[^\s]*)/gi;
+  let urls = text.match(urlRegex) || [];
 
   // Extract Email Addresses
-  const emailRegex = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g;
-  const emails = text.match(emailRegex) || [];
+  const emailRegex = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/gi;
+  let emails = text.match(emailRegex) || [];
+
+  // OCR email recovery: e.g. Meontact@codsoftin or contact@codsoftin
+  if (emails.length === 0) {
+    const ocrEmailMatch = text.match(/(?:[A-Za-z0-9._%+-]*?)(?:contact|info|support|careers|hr|admin|[a-z0-9_-]{3,})@([a-zA-Z0-9-]{3,25})(?:\.(?:[a-zA-Z]{2,6})|(in|com|org|net|co|io|tech|ai))\b/i);
+    if (ocrEmailMatch) {
+      let user = ocrEmailMatch[0].split('@')[0].replace(/^[^a-zA-Z0-9]+/, '').replace(/^[M|W|E|©]+/i, '');
+      user = user.replace(/^e?ontact/i, 'contact');
+      const tld = ocrEmailMatch[1] && ocrEmailMatch[2] ? ocrEmailMatch[2] : (ocrEmailMatch[1] || 'in');
+      const domain = `${ocrEmailMatch[1]}.${tld}`.toLowerCase();
+      emails.push(`${user || 'contact'}@${domain}`);
+      if (!urls.some(u => u.includes(domain))) {
+        urls.push(`https://www.${domain}`);
+      }
+    }
+  }
+
+  // OCR website recovery: e.g. @wwweodsoftin or www.codsoft.in
+  if (urls.length === 0) {
+    const ocrUrlMatch = text.match(/(?:www[.]?)([a-zA-Z0-9-]{3,25})(?:\.(?:[a-zA-Z]{2,6})|(in|com|org|net|co|io|tech|ai))\b/i);
+    if (ocrUrlMatch) {
+      const tld = ocrUrlMatch[2] || 'in';
+      const domain = `${ocrUrlMatch[1]}.${tld}`.toLowerCase();
+      urls.push(`https://www.${domain}`);
+    }
+  }
 
   // Extract Phone Numbers / WhatsApp
   const phoneRegex = /(\+?\d{1,3}[-.\s]?)?(\(?\d{3}\)?[-.\s]?)?\d{3}[-.\s]?\d{4,5}/g;
@@ -222,6 +279,8 @@ export function extractEntitiesFromInput(inputText, inputType = 'text', userProv
   // Detect CIN and GSTIN
   const cinMatch = text.match(/[LU]\d{5}[A-Z]{2}\d{4}[A-Z]{3}\d{6}/i);
   const gstinMatch = text.match(/[0-3]\d[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]/i);
+  const isMsme = /(?:msme|udyam|micro[,.\s]+small)/i.test(text);
+  const isIsoCertified = /iso\s*9001/i.test(text);
 
   // Detect Stock Ticker Mention (e.g. NSE:TCS, BSE:532540, NASDAQ:MSFT)
   const tickerMatch = text.match(/\b(?:nse|bse|nasdaq|nyse)[:\s]+([a-zA-Z0-9]+)\b/i);
@@ -243,22 +302,40 @@ export function extractEntitiesFromInput(inputText, inputType = 'text', userProv
     }
   }
 
-  // 1. Dedicated Internship Offer & Email Sender Pinpointing
+  // 1. Dedicated Position, Team & Issuer Pinpointing
   if (!detectedCompanyName) {
     const internshipIssuerPatterns = [
-      /(?:from|sender)[:\s]+([A-Za-z0-9\s&]{3,40}?)(?:\s*<|\s+via|\s+team|\s*\(|\n|$)/i,
+      /(?:virtual\s+)?internship\s+pos(?:it)?ion\s+(?:with|at)\s+["“'‘]?([A-Za-z0-9&.,'-]{2,35}?)["”'‘]?(?:\.|\s+we|\s+is|\s+are|[\n]|$)/i,
+      /(?:we\s+(?:at|st)|welcome\s+to|team\s+at)\s+["“'‘]?([A-Za-z0-9&.,'-]{2,35}?)["”'‘]?(?:\s+are|\s+is|\s+excited|\.|\n|$)/i,
+      /(?:^|[\n])\s*(?:from|sender|employer|company\s*name)\s*:\s*["“'‘]?([A-Za-z0-9\s&.,'-]{2,40}?)["”'‘]?(?:\s*<|\s+via|\s+team|\s*\(|[\n]|$)/i,
       /subject[:\s]+.*?(?:internship|selection|offer|virtual\s+program|appointment).*?(?:at|with|from)\s+([A-Za-z0-9\s&]{3,40}?)(?:\.|\n|$)/i,
-      /(?:internship|offer|selection\s+letter|appointment)\s+(?:at|with|from|for|in)\s+([A-Za-z0-9\s&]{3,40}?)(?:\s+for|\s+as|\s+team|\s+in|\.|\n|$)/i,
-      /(?:selected\s+for|offering\s+you|welcome\s+to).*?(?:internship|program)\s+(?:at|with)\s+([A-Za-z0-9\s&]{3,40}?)(?:\.|\n|$)/i,
+      /congratulate\s+you\s+on.*?with\s+["“'‘]?([A-Za-z0-9&.,'-]{2,35}?)["”'‘]?/i,
+      /(?:selected\s+for|offering\s+you|welcome\s+to).*?(?:internship|program)\s+(?:at|with)\s+["“'‘]?([A-Za-z0-9\s&]{3,40}?)["”'‘]?(?:\.|\n|$)/i,
+      /\b([A-Z][A-Za-z0-9&]{2,25}\s+(?:IT\s+SERVICE|IT\s+SERVICES|TECHNOLOGIES|SOLUTIONS))\b/i,
       /(?:regards|sincerely|cheers|best\s+regards)\s*[,:\n\r]+\s*(?:team\s+at|team\s+)?([A-Za-z0-9\s&]{3,40}?)(?:\s+team|\s+technologies|\s+tech|\.|\n|$)/i
     ];
 
     for (const pattern of internshipIssuerPatterns) {
       const match = text.match(pattern);
       if (match) {
-        let candidate = match[1].trim().replace(/[.,;!]+$/, '').trim();
+        let candidate = match[1].trim().replace(/^["'“”‘’`]+|["'“”‘’`]+$/g, '').replace(/[.,;!]+$/, '').trim();
         candidate = candidate.replace(/^(the|team|dear|we|our|from)\s+/i, '');
-        if (!isGenericPlatformOrTool(candidate) && candidate.length >= 3 && candidate.length <= 40) {
+        if (!isInvalidCompanyName(candidate)) {
+          detectedCompanyName = candidate;
+          break;
+        }
+      }
+    }
+  }
+
+  // 1b. Document Header Preceding "INTERNSHIP OFFER LETTER"
+  if (!detectedCompanyName) {
+    const docLines = text.split(/[\n]+/).map(l => l.trim()).filter(Boolean);
+    const offerIdx = docLines.findIndex(l => /offer\s*letter|appointment\s*letter/i.test(l));
+    if (offerIdx > 0) {
+      for (let i = 0; i < offerIdx; i++) {
+        let candidate = docLines[i].replace(/^["'“”‘’`]+|["'“”‘’`]+$/g, '').trim();
+        if (!isInvalidCompanyName(candidate)) {
           detectedCompanyName = candidate;
           break;
         }
@@ -303,7 +380,7 @@ export function extractEntitiesFromInput(inputText, inputType = 'text', userProv
 
   // 5. Prominent letterhead lines in the first 3 lines of input
   if (!detectedCompanyName) {
-    const firstLines = text.split(/[\r\n]+/).slice(0, 3);
+    const firstLines = text.split(/[\n]+/).slice(0, 3);
     for (const line of firstLines) {
       const cleanLine = line.trim();
       if (cleanLine.length >= 4 && cleanLine.length <= 50 && !/^(dear|subject|to|from|date|hi|hello|regards)/i.test(cleanLine)) {
@@ -346,7 +423,7 @@ export function extractEntitiesFromInput(inputText, inputType = 'text', userProv
   });
 
   if (corporateUrl) {
-    detectedDomain = corporateUrl.replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/:\d+$/, '');
+    detectedDomain = corporateUrl.replace(/^https?:\/\//, '').replace(/^www\./i, '').replace(/\/.*$/, '').replace(/:\d+$/, '');
   } else if (emails.length > 0) {
     const dom = (emails[0].split('@')[1] || '').toLowerCase();
     if (dom && !FREE_MAIL_DOMAINS.includes(dom) && !isThirdPartyOrPlatformDomain(dom)) {
@@ -361,6 +438,20 @@ export function extractEntitiesFromInput(inputText, inputType = 'text', userProv
         detectedDomain = match[1];
         break;
       }
+    }
+  }
+
+  // Normalize company name with clean domain if OCR had 1-2 char variance (e.g. CadSoft/CedSoft vs Codsoft)
+  if (detectedDomain) {
+    const domainCompany = formatDomainToCompanyName(detectedDomain);
+    if (domainCompany && detectedCompanyName) {
+      const la = detectedCompanyName.toLowerCase();
+      const lb = domainCompany.toLowerCase();
+      if (la === lb || la.includes(lb) || lb.includes(la) || (Math.abs(la.length - lb.length) <= 1 && [...la].filter((c, i) => c !== lb[i]).length <= 2)) {
+        detectedCompanyName = domainCompany;
+      }
+    } else if (domainCompany && (!detectedCompanyName || detectedCompanyName === 'Unspecified organisation')) {
+      detectedCompanyName = domainCompany;
     }
   }
 
@@ -379,6 +470,8 @@ export function extractEntitiesFromInput(inputText, inputType = 'text', userProv
     detectedAddress,
     cin: cinMatch ? cinMatch[0].toUpperCase() : null,
     gstin: gstinMatch ? gstinMatch[0].toUpperCase() : null,
+    isMsme,
+    isIsoCertified,
     ticker: tickerMatch ? tickerMatch[1] : null,
     linkedInUrl: linkedInUrlMatch ? linkedInUrlMatch[0] : null,
     userProvidedDetails: userProvidedDetails || null,
