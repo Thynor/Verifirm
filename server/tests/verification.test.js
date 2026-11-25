@@ -376,8 +376,36 @@ contact@codsoft.in`;
     console.log('✓ Test 14 Passed: Dates are strictly rejected and unlisted entities receive fair, evidence-based scores.\n');
   }
 
+  // Test 15: Direct Company Name Verification Mode
+  console.log('Running Test 15: Direct Company Name Verification Mode...');
+  {
+    const extTCS = extractEntitiesFromInput('Tata Consultancy Services', 'company');
+    assert.strictEqual(extTCS.inputType, 'company', 'Must preserve inputType company');
+    assert.strictEqual(extTCS.detectedCompanyName, 'Tata Consultancy Services', 'Must extract company name directly');
+    assert.strictEqual(extTCS.isOfferLetter, false, 'Direct company name search is not an offer letter');
+
+    const resTCS = await runComprehensiveAudit(extTCS);
+    console.log('  TCS MCA Status:', resTCS.government.status);
+    console.log('  TCS Coverage:', resTCS.coverageRatio);
+    console.log('  TCS Risk Level:', resTCS.riskLevel);
+    assert.strictEqual(resTCS.government.status, 'registered', 'TCS must be registered in MCA directory');
+    assert.strictEqual(resTCS.riskLevel, 'Low', 'Registered company must have Low risk');
+    assert(resTCS.howCalculated.checks.some(c => c.id === 'mca_gst' && c.performed && c.status === 'pass'), 'MCA check must pass');
+    assert(resTCS.quora.discussions.length >= 4, 'Quora discussions must be populated');
+
+    const extCod = extractEntitiesFromInput('CodSoft', 'company');
+    const resCod = await runComprehensiveAudit(extCod);
+    console.log('  CodSoft MCA Status:', resCod.government.status);
+    console.log('  CodSoft Physical Status:', resCod.physical.status);
+    console.log('  CodSoft Risk Level:', resCod.riskLevel);
+    assert.strictEqual(resCod.government.status, 'not_registered', 'CodSoft is unlisted on MCA');
+    assert.strictEqual(resCod.physical.status, 'no_building_found', 'CodSoft has no registered building on OpenStreetMap');
+    assert.strictEqual(resCod.riskLevel, 'Medium', 'Unregistered entity must be Medium risk');
+    console.log('✓ Test 15 Passed: Direct company name search verifies corporate registry, building, stock, and community discussions.\n');
+  }
+
   console.log('========================================');
-  console.log('ALL PHASE 1 & PHASE 2 TESTS COMPLETED SUCCESSFULLY (14/14 PASSED)');
+  console.log('ALL PHASE 1 & PHASE 2 TESTS COMPLETED SUCCESSFULLY (15/15 PASSED)');
   console.log('========================================');
 }
 

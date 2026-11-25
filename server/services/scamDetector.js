@@ -176,7 +176,8 @@ export async function runComprehensiveAudit(extractedData, userProvidedDetails =
   const redFlags = [];
   const greenFlags = [];
 
-  const hasTextToEvaluate = rawText && rawText.length >= 30;
+  const isCompanySearch = extractedData.inputType === 'company';
+  const hasTextToEvaluate = (rawText && rawText.length >= 30) || isCompanySearch;
 
   // Physical Building & Premises Verification Flags
   if (physical.status === 'no_building_found' && hasTextToEvaluate) {
@@ -326,7 +327,7 @@ export async function runComprehensiveAudit(extractedData, userProvidedDetails =
   // --- EVALUATE THE 8 SPECIFIC CHECKS (TOTAL WEIGHT: 100) ---
 
   // Check 1: Fee / Payment Demand (Weight: 20)
-  const feePerformed = !!(hasTextToEvaluate || flags.moneyDemanded);
+  const feePerformed = !isCompanySearch && !!(hasTextToEvaluate || flags.moneyDemanded);
   let feeStatus = 'not_run';
   let feePoints = 0;
   let feeDesc = 'No communication text provided to evaluate fee demands.';
@@ -396,7 +397,7 @@ export async function runComprehensiveAudit(extractedData, userProvidedDetails =
   }
 
   // Check 3: Statutory Corporate Registry (MCA / GSTIN) (Weight: 15)
-  const mcaPerformed = !!(government.status === 'found_in_input' || government.status === 'registered' || isMsme || cin || gstin);
+  const mcaPerformed = !!(government.status === 'found_in_input' || government.status === 'registered' || (isCompanySearch && government.status === 'not_registered') || isMsme || cin || gstin);
   let mcaStatus = 'not_run';
   let mcaPoints = 0;
   let mcaDesc = 'No Corporate Identification Number (CIN) or GSTIN provided in input.';
@@ -415,6 +416,10 @@ export async function runComprehensiveAudit(extractedData, userProvidedDetails =
       mcaStatus = 'pass';
       mcaPoints = 10;
       mcaDesc = 'Registered MSME / Udyam enterprise (Ministry of Micro, Small & Medium Enterprises).';
+    } else if (isCompanySearch && government.status === 'not_registered') {
+      mcaStatus = 'warning';
+      mcaPoints = 5;
+      mcaDesc = `No formal corporate registration found on the Ministry of Corporate Affairs (MCA) registry for "${detectedCompanyName}".`;
     } else {
       mcaStatus = 'fail';
       mcaPoints = 0;
@@ -428,7 +433,7 @@ export async function runComprehensiveAudit(extractedData, userProvidedDetails =
   }
 
   // Check 4: Informal Communication & Coercive Pressure (Weight: 10)
-  const informalOrPressurePerformed = !!(hasTextToEvaluate || flags.informalMessagingChannel || flags.fakeUrgency);
+  const informalOrPressurePerformed = !isCompanySearch && !!(hasTextToEvaluate || flags.informalMessagingChannel || flags.fakeUrgency);
   let informalStatus = 'not_run';
   let informalPoints = 0;
   let informalDesc = 'No communication text provided to evaluate channels and timeline.';
@@ -472,7 +477,7 @@ export async function runComprehensiveAudit(extractedData, userProvidedDetails =
 
   // Check 5: Sensitive Identity Document Collection (Weight: 10)
   const mentionsSensitiveDocs = flags.asksDocsOverChat || (hasTextToEvaluate && /(?:aadhaar|pan\s*card|passport|bank\s*passbook|bank\s*details|upload\s*id|identity\s*documents?)/i.test(rawText));
-  const docsPerformed = !!mentionsSensitiveDocs;
+  const docsPerformed = !isCompanySearch && !!mentionsSensitiveDocs;
   let docsStatus = 'not_run';
   let docsPoints = 0;
   let docsDesc = 'No document collection text provided to evaluate.';
@@ -538,7 +543,7 @@ export async function runComprehensiveAudit(extractedData, userProvidedDetails =
 
   // Check 7: Online Presence, LinkedIn & Reviews (Weight: 10)
   const hasUserPresence = !!(details && (details.claimedEmployeeCount || details.linkedInEmployeeCount || details.linkedInCreatedYear || details.ambitionBoxRating || details.glassdoorRating));
-  const hasLivePresence = !!(linkedin.status === 'verified' || redditAndReviews.status === 'verified');
+  const hasLivePresence = !!(linkedin.status === 'verified' || redditAndReviews.status === 'verified' || (quora && (quora.status === 'verified' || quora.discussions?.length > 0)));
   const onlinePresencePerformed = hasUserPresence || hasLivePresence;
   let onlineStatus = 'not_run';
   let onlinePoints = 0;
@@ -553,14 +558,14 @@ export async function runComprehensiveAudit(extractedData, userProvidedDetails =
     } else {
       onlineStatus = 'pass';
       onlinePoints = 10;
-      onlineDesc = 'Online corporate footprint recorded with consistent metrics.';
+      onlineDesc = 'Online corporate footprint recorded with community discussions.';
     }
   }
 
   // Check 8: Physical Operating Address & Offer Terms (Weight: 10)
   const hasAddress = physical.status === 'found_in_input' || physical.status === 'user_provided' || physical.status === 'found_online';
   const hasOfferQuality = isOfferLetter && /(?:₹|rs\.?|inr|salary|stipend|ctc|lpa|position|role|appointment)/i.test(rawText || '');
-  const addressOfferPerformed = hasAddress || hasOfferQuality;
+  const addressOfferPerformed = hasAddress || hasOfferQuality || (isCompanySearch && physical.status === 'no_building_found');
   let addressOfferStatus = 'not_run';
   let addressOfferPoints = 0;
   let addressOfferDesc = 'No physical office address or formal appointment offer details provided.';
@@ -575,6 +580,14 @@ export async function runComprehensiveAudit(extractedData, userProvidedDetails =
       addressOfferPoints = 10;
       addressOfferDesc = `Operating office address verified with professional offer terms.`;
       greenFlags.push('Operating address disclosed or verified in records');
+    } else if (isCompanySearch && hasAddress) {
+      addressOfferStatus = 'pass';
+      addressOfferPoints = 10;
+      addressOfferDesc = `Registered commercial office building verified: ${physical.officeAddress}`;
+    } else if (isCompanySearch && physical.status === 'no_building_found') {
+      addressOfferStatus = 'warning';
+      addressOfferPoints = 4;
+      addressOfferDesc = `This company does not have a registered commercial office building in public geographic records.`;
     } else {
       addressOfferStatus = 'warning';
       addressOfferPoints = 5;
@@ -849,7 +862,7 @@ export async function runComprehensiveAudit(extractedData, userProvidedDetails =
     badgeColor = 'amber';
   } else {
     // 0 red flags
-    if (government.cinValid && !digitalIdentity.isDomainMismatch && !digitalIdentity.isFreeEmail && performedCount >= 5) {
+    if ((government.cinValid || government.status === 'registered') && !digitalIdentity.isDomainMismatch && !digitalIdentity.isFreeEmail && (performedCount >= 5 || isCompanySearch)) {
       riskLevel = 'Low';
       verdict = 'VERIFIED';
       badgeColor = 'emerald';

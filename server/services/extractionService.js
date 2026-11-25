@@ -130,6 +130,44 @@ export function extractSnippet(text, pattern) {
 
 export function extractEntitiesFromInput(inputText, inputType = 'text', userProvidedDetails = null) {
   const text = (inputText || '').trim();
+
+  // Handle direct company name lookup mode
+  if (inputType === 'company') {
+    let cleanCompany = text.replace(/^["'“”‘’`]+|["'“”‘’`]+$/g, '').trim();
+    return {
+      rawText: text,
+      inputType: 'company',
+      isOfferLetter: false,
+      detectedCompanyName: cleanCompany,
+      detectedDomain: null,
+      detectedEmail: null,
+      detectedPhone: null,
+      detectedAddress: userProvidedDetails?.companyAddress?.trim() || null,
+      cin: null,
+      gstin: null,
+      isMsme: false,
+      isIsoCertified: false,
+      ticker: null,
+      linkedInUrl: null,
+      userProvidedDetails: userProvidedDetails || null,
+      flags: {
+        moneyDemanded: false,
+        feeSnippet: null,
+        isTypingJob: false,
+        isTaskBasedScam: false,
+        isVideoLikingScam: false,
+        isReshippingScam: false,
+        isFakeChequeScam: false,
+        isScreenShareOrAppScam: false,
+        asksDocsOverChat: false,
+        docsSnippet: null,
+        fakeUrgency: false,
+        urgencySnippet: null,
+        informalMessagingChannel: false,
+        informalChannelSnippet: null
+      }
+    };
+  }
   
   // Extract URLs (including www.domain.tld without http://)
   const urlRegex = /(?:https?:\/\/[^\s]+|\b(?:www\.)[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b[^\s]*)/gi;
@@ -411,7 +449,7 @@ export function extractEntitiesFromInput(inputText, inputType = 'text', userProv
     }
   }
 
-  if (!detectedCompanyName) {
+  if (!detectedCompanyName || isInvalidCompanyName(detectedCompanyName)) {
     detectedCompanyName = 'Unspecified organisation';
   }
 
@@ -450,9 +488,13 @@ export function extractEntitiesFromInput(inputText, inputType = 'text', userProv
       if (la === lb || la.includes(lb) || lb.includes(la) || (Math.abs(la.length - lb.length) <= 1 && [...la].filter((c, i) => c !== lb[i]).length <= 2)) {
         detectedCompanyName = domainCompany;
       }
-    } else if (domainCompany && (!detectedCompanyName || detectedCompanyName === 'Unspecified organisation')) {
+    } else if (domainCompany && (!detectedCompanyName || detectedCompanyName === 'Unspecified organisation' || isInvalidCompanyName(detectedCompanyName))) {
       detectedCompanyName = domainCompany;
     }
+  }
+
+  if (isInvalidCompanyName(detectedCompanyName)) {
+    detectedCompanyName = 'Unspecified organisation';
   }
 
   // Determine whether input represents an offer letter / email document

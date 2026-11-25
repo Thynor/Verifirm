@@ -21,6 +21,7 @@ export function InputPortal({
   const [activeTab, setActiveTab] = useState('text');
   const [inputText, setInputText] = useState('');
   const [inputUrl, setInputUrl] = useState('');
+  const [inputCompany, setInputCompany] = useState('');
   const [imagePreview, setImagePreview] = useState(null);
   const [imageFileName, setImageFileName] = useState('');
   const [ocrStatus, setOcrStatus] = useState('');
@@ -165,7 +166,10 @@ export function InputPortal({
         }))
     };
 
-    if (activeTab === 'url') {
+    if (activeTab === 'company') {
+      if (!inputCompany.trim()) return;
+      onAnalyze({ type: 'company', content: inputCompany.trim(), userProvidedDetails });
+    } else if (activeTab === 'url') {
       if (!inputUrl.trim()) return;
       onAnalyze({ type: 'url', content: inputUrl, userProvidedDetails });
     } else if (activeTab === 'screenshot') {
@@ -276,6 +280,19 @@ export function InputPortal({
           >
             <Link2 className="w-4 h-4" />
             <span>Paste Website / Link</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('company')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all min-h-[44px] ${
+              activeTab === 'company'
+                ? 'bg-[#8458B3] text-white shadow-sm'
+                : 'text-[#494D5F] dark:text-[#E5EAF5] hover:bg-[#D0BDF4]/30'
+            }`}
+          >
+            <Building2 className="w-4 h-4" />
+            <span>{t.companyTab || 'Enter Company Name'}</span>
           </button>
         </div>
 
@@ -420,6 +437,59 @@ export function InputPortal({
                 />
                 <Link2 className="w-5 h-5 text-[#5d6180] absolute left-3.5 top-1/2 -translate-y-1/2" />
               </div>
+            </div>
+          )}
+
+          {/* Tab 4: Company Name Direct Search */}
+          {activeTab === 'company' && (
+            <div className="space-y-3">
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#494D5F] dark:text-[#E5EAF5] flex items-center justify-between">
+                <span>{t.companyInputLabel || 'ENTER COMPANY OR STARTUP NAME'}</span>
+                <span className="text-[11px] font-mono text-[#8458B3] dark:text-[#D0BDF4]">Live MCA + Maps + Stock + Quora Check</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={inputCompany}
+                  onChange={(e) => setInputCompany(e.target.value)}
+                  placeholder={t.companyPlaceholder || 'e.g. Tata Consultancy Services, Infosys, CodSoft, CodeAlpha, Wipro...'}
+                  className="w-full vf-input px-4 py-3.5 pl-11 text-base font-sans"
+                />
+                <Building2 className="w-5 h-5 text-[#8458B3] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                {inputCompany && (
+                  <button
+                    type="button"
+                    onClick={() => setInputCompany('')}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#5d6180] hover:text-[#494D5F] dark:hover:text-white px-2 py-1 rounded bg-[#E5EAF5] dark:bg-[#3a3e4f]"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+
+              {/* Quick Company Suggestion Pills */}
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <span className="text-xs text-[#5d6180] dark:text-[#E5EAF5]/70">Try quick check:</span>
+                {[
+                  'Tata Consultancy Services',
+                  'Infosys',
+                  'CodSoft',
+                  'CodeAlpha'
+                ].map((co) => (
+                  <button
+                    key={co}
+                    type="button"
+                    onClick={() => setInputCompany(co)}
+                    className="text-xs px-2.5 py-1 rounded-lg bg-[#E5EAF5] dark:bg-[#3a3e4f] hover:bg-[#D0BDF4]/40 text-[#494D5F] dark:text-[#E5EAF5] border border-[#494D5F]/15 dark:border-[#D0BDF4]/20 transition-all font-medium"
+                  >
+                    {co}
+                  </button>
+                ))}
+              </div>
+
+              <p className="text-xs text-[#5d6180] dark:text-[#E5EAF5]/80">
+                {t.companyHelperText || 'Verify corporate registration on MCA, physical office buildings on OpenStreetMap, real-time stock valuation, and community reports on Reddit & Quora.'}
+              </p>
             </div>
           )}
 
@@ -626,7 +696,7 @@ export function InputPortal({
 
             <button
               type="submit"
-              disabled={isLoading || isOcrLoading || (activeTab === 'text' && !inputText) || (activeTab === 'url' && !inputUrl) || (activeTab === 'screenshot' && !inputText && !imagePreview)}
+              disabled={isLoading || isOcrLoading || (activeTab === 'text' && !inputText) || (activeTab === 'url' && !inputUrl) || (activeTab === 'company' && !inputCompany) || (activeTab === 'screenshot' && !inputText && !imagePreview)}
               className={`w-full sm:w-auto vf-btn-primary min-h-[48px] px-8 py-3.5 text-base font-bold shadow-md disabled:opacity-50 disabled:cursor-not-allowed ${
                 !currentUser && searchCount >= 5
                   ? 'bg-gradient-to-r from-[#C62828] to-[#B26A00] text-white'
@@ -641,7 +711,7 @@ export function InputPortal({
               ) : (
                 <>
                   <Search className="w-5 h-5 text-white" />
-                  <span>{isLoading ? t.verifyingBtn : t.verifyBtn}</span>
+                  <span>{isLoading ? t.verifyingBtn : (activeTab === 'company' ? (t.verifyCompanyBtn || 'Verify Company Now') : t.verifyBtn)}</span>
                   <ArrowUpRight className="w-5 h-5 ml-0.5 text-white" />
                 </>
               )}
